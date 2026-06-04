@@ -1,0 +1,93 @@
+﻿validate_wave_workflow.py 가이드
+===============================
+
+이 파일은 현재 3D 파도 시뮬레이션 워크플로를 빠르게 검증하는 end-to-end 체크
+스크립트입니다.
+
+목적은 큰 시뮬레이션을 돌리는 것이 아니라, 주요 코드 경로가 아직 정상인지
+확인하는 것입니다.
+
+
+1. 무엇을 검증하는가
+--------------------
+
+validate_wave_workflow.py는 다음을 순서대로 확인합니다.
+
+1. CUDA 또는 CPU device 확인
+2. bathymetry 생성
+3. CFL 기반 dt 계산
+4. 작은 격자 shallow-water simulation 실행
+5. frames/depth 값이 유한한지 확인
+6. NPZ dataset 저장
+7. NPZ dataset 다시 읽기
+8. metadata와 shape 확인
+9. Plotly interactive figure 생성
+10. HTML 저장
+11. HTML 안에 Plotly.newPlot과 title marker가 있는지 확인
+
+
+2. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe validate_wave_workflow.py
+
+조금 다른 크기로 실행:
+
+    .\.venv\Scripts\python.exe validate_wave_workflow.py --size 128 --steps 120 --frame-every 20
+
+
+3. 기본 출력
+------------
+
+기본 실행은 outputs 폴더에 다음 파일을 만듭니다.
+
+- workflow_validation_dataset.npz
+- workflow_validation_viewer.html
+
+이 파일들은 검증 산출물이며 재생성 가능합니다.
+
+
+4. 현재 검증 결과
+-----------------
+
+최근 실행 결과:
+
+- device: cuda
+- GPU: NVIDIA GeForce RTX 4060 Ti
+- CFL dt: 0.00967552
+- simulated frames: 6
+- NPZ 저장/불러오기 성공
+- Plotly HTML 생성 성공
+- HTML marker 확인 성공
+- pip check 통과
+
+
+5. 언제 실행하면 좋은가
+-----------------------
+
+다음 상황에서 실행하면 좋습니다.
+
+- solver 코드를 수정한 뒤
+- 데이터셋 저장 형식을 수정한 뒤
+- Plotly viewer를 수정한 뒤
+- 새 패키지를 설치하거나 환경을 바꾼 뒤
+- GitHub에 커밋하기 전 빠른 sanity check가 필요할 때
+
+
+6. 한계
+------
+
+이 검증은 작은 격자로 빠르게 도는 smoke test입니다.
+
+- 큰 격자 성능 검증은 benchmark_bathymetry.py가 담당합니다.
+- 실제 브라우저에서 렌더링을 눈으로 확인하는 테스트는 아닙니다.
+- 물리 모델의 정확성을 검증하는 과학적 테스트도 아닙니다.
+
+
+7. 한 줄 요약
+--------------
+
+validate_wave_workflow.py는 GPU solver, 데이터셋 저장/불러오기, Plotly HTML 생성이
+한 번에 이어지는지 확인하는 빠른 end-to-end 검증 도구입니다.
