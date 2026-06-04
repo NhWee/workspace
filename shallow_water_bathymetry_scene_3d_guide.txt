@@ -1,0 +1,114 @@
+﻿shallow_water_bathymetry_scene_3d.py 가이드
+==========================================
+
+이 파일은 bathymetry shallow-water simulation의 수면과 바닥 지형을 하나의
+3D 장면으로 렌더링합니다.
+
+이전 shallow_water_bathymetry_3d.py는 수면 eta만 3D surface로 그렸습니다.
+이번 파일은 바닥 지형도 함께 보여줍니다.
+
+    water surface = eta(x, y, t)
+    bottom surface = -H(x, y)
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+shallow_water_bathymetry_scene_3d.py는 다음 과정을 수행합니다.
+
+1. simulate_bathymetry 함수로 GPU에서 파도 계산을 실행합니다.
+2. 수면 프레임 eta(x, y, t)를 저장합니다.
+3. 수심 H(x, y)를 바닥 표면 z = -H(x, y)로 변환합니다.
+4. 같은 3D 축 안에 바닥 지형과 반투명 수면을 함께 그립니다.
+5. GIF, final PNG, preview PNG, depth map을 outputs 폴더에 저장합니다.
+
+
+2. 왜 필요한가
+--------------
+
+수면만 보면 파도가 왜 특정 위치에서 휘거나 찢기는지 직관적으로 알기 어렵습니다.
+바닥 지형을 함께 보면 다음 관계가 더 잘 보입니다.
+
+- 깊은 곳과 얕은 곳의 파동 속도 차이
+- 섬 주변에서 생기는 차단과 우회
+- shoal 주변에서 생기는 굴절과 간섭
+- shelf 위로 진입하는 wave packet의 모양 변화
+
+즉 이 파일은 계산 정확도보다는 "시뮬레이션을 해석하기 쉬운 3D 장면"을 만드는
+역할을 합니다.
+
+
+3. 시각화 방식
+--------------
+
+바닥:
+
+    z = -depth
+
+수면:
+
+    z = eta
+
+수면은 `Blues_r` 컬러맵과 반투명 alpha를 사용하고, 바닥은 `terrain` 컬러맵을
+사용합니다. 이렇게 하면 수면 아래의 지형을 동시에 볼 수 있습니다.
+
+Matplotlib 3D 렌더링은 실시간 엔진은 아니므로, 렌더링할 때는
+--max-surface-points 옵션으로 downsampling합니다.
+
+
+4. 실행 방법
+------------
+
+PowerShell에서 실행합니다.
+
+    cd C:\Users\Administrator\Documents\Codex\2026-06-02\gpu
+    .\.venv\Scripts\python.exe shallow_water_bathymetry_scene_3d.py
+
+더 큰 계산을 하되 렌더링은 적당히 줄이려면:
+
+    .\.venv\Scripts\python.exe shallow_water_bathymetry_scene_3d.py --size 512 --steps 720 --max-surface-points 128
+
+더 가벼운 preview를 만들려면:
+
+    .\.venv\Scripts\python.exe shallow_water_bathymetry_scene_3d.py --size 256 --steps 240 --frame-every 12 --max-surface-points 96
+
+
+5. 출력 파일
+------------
+
+실행하면 outputs 폴더에 다음 파일이 생성됩니다.
+
+- shallow_water_bathymetry_scene_3d.gif
+- shallow_water_bathymetry_scene_3d_final.png
+- shallow_water_bathymetry_scene_3d_preview.png
+- shallow_water_bathymetry_depth.png
+
+
+6. 현재 한계
+------------
+
+이 파일은 Matplotlib 기반 렌더러입니다.
+
+- 실시간 회전/확대/축소용 뷰어는 아님
+- 수면과 바닥의 alpha sorting이 복잡한 장면에서는 완벽하지 않을 수 있음
+- foam, shading, reflection, refraction 같은 물 그래픽 효과는 없음
+- 수면 색상이 물리량을 엄밀히 나타내기보다는 장면 해석을 돕기 위한 색상임
+
+
+7. 다음 개발 방향
+-----------------
+
+이 렌더링 단계를 바탕으로 다음 확장이 자연스럽습니다.
+
+1. Plotly HTML 기반 interactive 3D scene
+2. Three.js 기반 브라우저 3D viewer
+3. 수면 높이와 속도 크기를 함께 색상으로 표시
+4. 바닥 지형, wet/dry mask, 수면을 각각 켜고 끄는 뷰어
+5. 긴 시뮬레이션을 프레임 단위로 저장하고 나중에 렌더링하는 구조
+
+
+8. 한 줄 요약
+--------------
+
+shallow_water_bathymetry_scene_3d.py는 GPU로 계산한 수면 eta와 바닥 지형
+H(x, y)를 하나의 3D 장면으로 보여주는 해석용 렌더러입니다.
