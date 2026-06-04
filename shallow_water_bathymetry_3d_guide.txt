@@ -1,0 +1,148 @@
+﻿shallow_water_bathymetry_3d.py 가이드
+====================================
+
+이 파일은 현재 3D 파도 시뮬레이션 워크플로에서 지형과 수심을 처음으로 넣은
+버전입니다. shallow_water_uv_3d.py가 일정한 평균 수심 H를 사용했다면,
+shallow_water_bathymetry_3d.py는 위치마다 다른 수심 H(x, y)를 사용합니다.
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+2D 격자 위에 다음 필드를 둡니다.
+
+- eta(x, y, t): 평균 수면으로부터의 수면 변위
+- u(x, y, t): x방향 수평 속도
+- v(x, y, t): y방향 수평 속도
+- H(x, y): 위치별 수심
+- wet_mask(x, y): 물이 있는 셀과 거의 마른 셀을 구분하는 마스크
+
+계산은 GPU에서 수행하고, eta를 z축 높이로 사용해 3D surface animation을
+저장합니다.
+
+    z = eta(x, y, t)
+
+또한 수심 지형을 확인할 수 있도록 depth map도 함께 저장합니다.
+
+
+2. 사용한 방정식
+----------------
+
+기본 형태는 선형화된 shallow-water equations입니다.
+
+    d eta / dt + div(H u, H v) = 0
+    d u   / dt = -g * d eta / dx
+    d v   / dt = -g * d eta / dy
+
+일정 수심 버전에서는 H가 상수였지만, 이 버전에서는 H가 위치마다 달라집니다.
+
+이 차이 때문에 파동 속도도 위치마다 달라집니다.
+
+    wave_speed ~= sqrt(g * H)
+
+깊은 곳에서는 파동이 더 빠르게 이동하고, 얕은 곳에서는 더 느리게 이동합니다.
+그래서 지형 주변에서 파동의 굴절, 간섭, 퍼짐이 더 다양하게 나타납니다.
+
+
+3. bathymetry 구성
+------------------
+
+make_bathymetry 함수는 인공 지형을 만듭니다.
+
+- 왼쪽은 상대적으로 깊은 물
+- 오른쪽으로 갈수록 얕아지는 shelf
+- 중앙 오른쪽에는 얕은 shoal
+- 왼쪽 위 근처에는 거의 마른 island 영역
+
+depth가 아주 작아지는 영역은 wet_mask로 막습니다. 이 영역에서는 eta, u, v가
+0에 가깝게 유지되어 파동이 통과하지 못하는 장애물처럼 작동합니다.
+
+
+4. 초기 파도
+------------
+
+make_incoming_wave 함수는 왼쪽에서 들어오는 wave packet을 만듭니다.
+
+    eta = Gaussian packet * transverse envelope * cosine ripple
+
+이 초기 파동은 오른쪽으로 퍼지면서 shelf, shoal, island 주변에서 모양이
+변합니다. 그래서 이전의 원형 pulse보다 "해안 지형을 만나는 파도"에 가까운
+실험을 할 수 있습니다.
+
+
+5. 출력 파일
+------------
+
+실행하면 outputs 폴더에 다음 파일이 생성됩니다.
+
+- shallow_water_bathymetry_surface_3d.gif
+- shallow_water_bathymetry_surface_3d_final.png
+- shallow_water_bathymetry_surface_3d_preview.png
+- shallow_water_bathymetry_depth.png
+
+첫 세 파일은 수면 eta의 3D 렌더링입니다. 마지막 파일은 수심 H(x, y)를 보여주는
+2D depth map입니다.
+
+
+6. 실행 방법
+------------
+
+PowerShell에서 실행합니다.
+
+    cd C:\Users\Administrator\Documents\Codex\2026-06-02\gpu
+    .\.venv\Scripts\python.exe shallow_water_bathymetry_3d.py
+
+더 큰 격자로 계산하려면:
+
+    .\.venv\Scripts\python.exe shallow_water_bathymetry_3d.py --size 512 --steps 1200 --max-surface-points 160
+
+렌더링을 가볍게 하려면:
+
+    .\.venv\Scripts\python.exe shallow_water_bathymetry_3d.py --size 512 --max-surface-points 96
+
+
+7. 주요 옵션
+------------
+
+- --size: GPU에서 계산할 격자 크기
+- --steps: 시뮬레이션 스텝 수
+- --frame-every: 몇 스텝마다 렌더링 프레임을 저장할지
+- --gravity: 중력 계수 g
+- --dt: 시간 간격
+- --damping: 전역 감쇠율
+- --fps: GIF 초당 프레임 수
+- --max-surface-points: 3D 렌더링에 사용할 축당 최대 점 수
+- --output-dir: 결과 저장 폴더
+
+
+8. 현재 한계
+------------
+
+이 버전은 지형과 dry mask를 넣었지만 여전히 단순화된 모델입니다.
+
+- 비선형 momentum flux는 아직 없음
+- wet/dry boundary가 정교한 해안선 알고리즘은 아님
+- 섬 주변의 반사 조건은 단순 mask 처리
+- 실제 파도 깨짐, foam, spray는 없음
+- Matplotlib 렌더링이라 실시간 3D 인터랙션은 제한적
+
+
+9. 다음 개발 방향
+-----------------
+
+이제 다음 개발 후보는 꽤 명확합니다.
+
+1. CFL 조건 기반 dt 자동 선택
+2. 512, 1024 격자 벤치마크 자동화
+3. 지형 위에 수면과 바닥을 함께 렌더링
+4. obstacle boundary의 반사 조건 개선
+5. 비선형 shallow-water flux 구현
+6. Plotly 또는 Three.js 기반 인터랙티브 3D viewer
+
+
+10. 한 줄 요약
+--------------
+
+shallow_water_bathymetry_3d.py는 GPU shallow-water solver에 위치별 수심
+H(x, y)와 dry mask를 추가해, 파도가 지형과 상호작용하는 첫 번째 3D 수면
+시뮬레이션 단계입니다.
