@@ -39,17 +39,28 @@ def divergence_flux(flux_x: torch.Tensor, flux_y: torch.Tensor, dx: float) -> to
     return gradient_x(flux_x, dx) + gradient_y(flux_y, dx)
 
 
+def compute_cfl_dt(depth: torch.Tensor, gravity: float, dx: float, cfl: float) -> float:
+    max_depth = float(depth.max())
+    if max_depth <= 0.0:
+        raise ValueError("Bathymetry depth must contain at least one wet cell.")
+    max_wave_speed = (gravity * max_depth) ** 0.5
+    return cfl * dx / max_wave_speed
+
+
 def simulate_bathymetry(
     size: int,
     steps: int,
     frame_every: int,
     gravity: float,
-    dt: float,
+    dt: float | None,
     damping: float,
     device: torch.device,
+    cfl: float = 0.35,
 ) -> tuple[list[torch.Tensor], torch.Tensor]:
     dx = 2.0 / (size - 1)
     depth, wet_mask = make_bathymetry(size, device)
+    if dt is None:
+        dt = compute_cfl_dt(depth, gravity, dx, cfl)
     eta = make_incoming_wave(size, device) * wet_mask
     u = torch.zeros_like(eta)
     v = torch.zeros_like(eta)
@@ -100,7 +111,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=900, help="Simulation steps.")
     parser.add_argument("--frame-every", type=int, default=12, help="Save one render frame every N simulation steps.")
     parser.add_argument("--gravity", type=float, default=1.0, help="Gravity coefficient g.")
-    parser.add_argument("--dt", type=float, default=0.0022, help="Time step.")
+    parser.add_argument("--dt", default="auto", help="Time step, or 'auto' to use a CFL-based value.")
+    parser.add_argument("--cfl", type=float, default=0.35, help="CFL factor used when --dt auto.")
     parser.add_argument("--damping", type=float, default=0.9994, help="Global damping per step.")
     parser.add_argument("--fps", type=int, default=20, help="Output GIF frames per second.")
     parser.add_argument("--max-surface-points", type=int, default=128, help="Max rendered points per surface axis.")
@@ -114,15 +126,17 @@ def main() -> None:
     print(f"Using device: {device}")
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
+    dt = None if str(args.dt).lower() == "auto" else float(args.dt)
 
     frames, depth = simulate_bathymetry(
         size=args.size,
         steps=args.steps,
         frame_every=args.frame_every,
         gravity=args.gravity,
-        dt=args.dt,
+        dt=dt,
         damping=args.damping,
         device=device,
+        cfl=args.cfl,
     )
     save_3d_outputs(
         frames,

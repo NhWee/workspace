@@ -1,0 +1,73 @@
+﻿benchmark_bathymetry.py 가이드
+==============================
+
+이 파일은 bathymetry shallow-water solver의 GPU 계산 성능을 측정하는
+벤치마크 스크립트입니다.
+
+렌더링은 하지 않고 solver 계산만 측정합니다. 그래서 Matplotlib 3D GIF 저장
+속도가 아니라, 실제 PyTorch CUDA 격자 계산이 어느 정도 빠른지 확인할 수
+있습니다.
+
+
+1. 측정하는 것
+--------------
+
+각 격자 크기마다 다음 값을 기록합니다.
+
+- device: 계산 장치
+- size: 격자 크기
+- steps: 시뮬레이션 스텝 수
+- dt: CFL 조건으로 계산한 시간 간격
+- elapsed_sec: 실행 시간
+- steps_per_sec: 초당 시뮬레이션 스텝 수
+- million_cell_steps_per_sec: 초당 백만 cell-step 처리량
+- max_abs_eta: 마지막 프레임의 최대 수면 변위 절댓값
+- peak_vram_gib: 최대 GPU 메모리 사용량
+
+
+2. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe benchmark_bathymetry.py
+
+명시적으로 격자 크기와 스텝 수를 줄 수 있습니다.
+
+    .\.venv\Scripts\python.exe benchmark_bathymetry.py --sizes 256,512,1024 --steps 600
+
+더 무겁게 돌릴 수도 있습니다.
+
+    .\.venv\Scripts\python.exe benchmark_bathymetry.py --sizes 1024,2048 --steps 2000
+
+
+3. CFL 기반 dt
+--------------
+
+벤치마크는 각 격자 크기마다 자동으로 dt를 계산합니다.
+
+    dt = cfl * dx / sqrt(g * max(H))
+
+해상도를 높이면 dx가 작아지고, dt도 작아집니다. 이 덕분에 격자 크기를 키워도
+같은 안정성 기준으로 비교할 수 있습니다.
+
+
+4. 최근 결과
+------------
+
+RTX 4060 Ti에서 600 steps 기준:
+
+- 256 x 256: 0.232초, 169.6M cell-steps/s, 0.004 GiB
+- 512 x 512: 0.227초, 692.0M cell-steps/s, 0.018 GiB
+- 1024 x 1024: 0.274초, 2299.6M cell-steps/s, 0.070 GiB
+
+현재 solver는 메모리 사용량이 작고 GPU 계산 여유가 큽니다. 앞으로 병목은
+대체로 3D 렌더링, 더 복잡한 물리 모델, 더 긴 시간 적분에서 생길 가능성이
+높습니다.
+
+
+5. 한 줄 요약
+--------------
+
+benchmark_bathymetry.py는 3D 파도 시뮬레이션 워크플로가 더 큰 격자로 확장될
+수 있는지 확인하기 위한 GPU 성능/안정성 측정 도구입니다.

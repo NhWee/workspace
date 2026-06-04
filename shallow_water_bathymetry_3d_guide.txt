@@ -108,7 +108,8 @@ PowerShell에서 실행합니다.
 - --steps: 시뮬레이션 스텝 수
 - --frame-every: 몇 스텝마다 렌더링 프레임을 저장할지
 - --gravity: 중력 계수 g
-- --dt: 시간 간격
+- --dt: 시간 간격. 기본값은 auto이며 CFL 조건으로 계산합니다.
+- --cfl: --dt auto일 때 사용하는 CFL 계수
 - --damping: 전역 감쇠율
 - --fps: GIF 초당 프레임 수
 - --max-surface-points: 3D 렌더링에 사용할 축당 최대 점 수
@@ -132,12 +133,11 @@ PowerShell에서 실행합니다.
 
 이제 다음 개발 후보는 꽤 명확합니다.
 
-1. CFL 조건 기반 dt 자동 선택
-2. 512, 1024 격자 벤치마크 자동화
-3. 지형 위에 수면과 바닥을 함께 렌더링
-4. obstacle boundary의 반사 조건 개선
-5. 비선형 shallow-water flux 구현
-6. Plotly 또는 Three.js 기반 인터랙티브 3D viewer
+1. 지형 위에 수면과 바닥을 함께 렌더링
+2. obstacle boundary의 반사 조건 개선
+3. 비선형 shallow-water flux 구현
+4. Plotly 또는 Three.js 기반 인터랙티브 3D viewer
+5. 더 큰 격자와 긴 시간 적분을 위한 저장/체크포인트 구조
 
 
 10. 한 줄 요약
@@ -146,3 +146,36 @@ PowerShell에서 실행합니다.
 shallow_water_bathymetry_3d.py는 GPU shallow-water solver에 위치별 수심
 H(x, y)와 dry mask를 추가해, 파도가 지형과 상호작용하는 첫 번째 3D 수면
 시뮬레이션 단계입니다.
+
+
+11. CFL 자동 dt와 벤치마크
+--------------------------
+
+격자 기반 파동 계산은 시간 간격 dt가 너무 크면 수치적으로 불안정해질 수
+있습니다. 이 파일은 기본적으로 --dt auto를 사용합니다.
+
+auto 모드에서는 다음 형태로 dt를 계산합니다.
+
+    dt = cfl * dx / sqrt(g * max(H))
+
+여기서:
+
+- dx: 격자 간격
+- g: 중력 계수
+- max(H): 가장 깊은 셀의 수심
+- cfl: 안정성 여유 계수
+
+해상도가 커질수록 dx가 작아지므로 dt도 자동으로 작아집니다. 이 덕분에
+256, 512, 1024처럼 격자 크기를 키워도 안정적인 기본값으로 시작할 수 있습니다.
+
+벤치마크는 다음 명령으로 실행합니다.
+
+    .\.venv\Scripts\python.exe benchmark_bathymetry.py --sizes 256,512,1024 --steps 600
+
+최근 RTX 4060 Ti 기준 결과:
+
+- 256 x 256: 0.232초, 169.6M cell-steps/s
+- 512 x 512: 0.227초, 692.0M cell-steps/s
+- 1024 x 1024: 0.274초, 2299.6M cell-steps/s
+
+벤치마크 CSV는 outputs/bathymetry_benchmark.csv에 저장됩니다.
