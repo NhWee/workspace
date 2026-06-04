@@ -1,0 +1,126 @@
+﻿shallow_water_plotly_viewer.py 가이드
+===================================
+
+이 파일은 GPU bathymetry wave simulation 결과를 브라우저에서 볼 수 있는
+인터랙티브 3D HTML 파일로 저장합니다.
+
+Matplotlib 기반 GIF/PNG는 고정된 시점의 결과를 보기 좋게 남기는 데 좋습니다.
+Plotly viewer는 사용자가 직접 회전, 확대, 이동, 프레임 슬라이더 조작을 할 수
+있게 해줍니다.
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+shallow_water_plotly_viewer.py는 다음 과정을 수행합니다.
+
+1. simulate_bathymetry 함수로 GPU에서 파도 계산을 실행합니다.
+2. 수면 eta(x, y, t) 프레임을 저장합니다.
+3. 수심 H(x, y)를 바닥 표면 z = -H(x, y)로 변환합니다.
+4. Plotly Surface trace로 바닥과 수면을 만듭니다.
+5. 프레임 애니메이션, Play/Pause 버튼, 프레임 슬라이더를 추가합니다.
+6. outputs/shallow_water_plotly_viewer.html 파일을 저장합니다.
+
+
+2. 시각화 구조
+--------------
+
+바닥:
+
+    z = -H(x, y)
+
+수면:
+
+    z = eta(x, y, t)
+
+바닥은 Earth colorscale, 수면은 Blues colorscale을 사용합니다. 수면은 반투명하게
+표시해서 아래 지형을 함께 볼 수 있습니다.
+
+
+3. 실행 방법
+------------
+
+PowerShell에서 실행합니다.
+
+    cd C:\Users\Administrator\Documents\Codex\2026-06-02\gpu
+    .\.venv\Scripts\python.exe shallow_water_plotly_viewer.py
+
+생성된 HTML 파일:
+
+    outputs\shallow_water_plotly_viewer.html
+
+브라우저에서 이 파일을 열면 3D 장면을 직접 회전하고 확대할 수 있습니다.
+
+
+4. 가벼운 실행 예시
+-------------------
+
+HTML 파일은 Plotly JavaScript와 프레임 데이터를 포함하므로 너무 많은 점과
+프레임을 넣으면 파일이 커집니다.
+
+가벼운 미리보기:
+
+    .\.venv\Scripts\python.exe shallow_water_plotly_viewer.py --size 96 --steps 90 --frame-every 15 --max-surface-points 48
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe shallow_water_plotly_viewer.py --size 192 --steps 360 --frame-every 18 --max-surface-points 96
+
+조금 더 선명한 실행:
+
+    .\.venv\Scripts\python.exe shallow_water_plotly_viewer.py --size 256 --steps 480 --frame-every 20 --max-surface-points 128
+
+
+5. 주요 옵션
+------------
+
+- --size: GPU에서 계산할 격자 크기
+- --steps: 시뮬레이션 스텝 수
+- --frame-every: 몇 스텝마다 viewer 프레임을 저장할지
+- --gravity: 중력 계수 g
+- --dt: 시간 간격. 기본값은 auto
+- --cfl: --dt auto일 때 사용하는 CFL 계수
+- --damping: 전역 감쇠율
+- --max-surface-points: Plotly surface로 렌더링할 축당 최대 점 수
+- --output-dir: HTML 저장 폴더
+
+
+6. 현재 검증
+------------
+
+기본 실행에서 다음을 확인했습니다.
+
+- CUDA GPU에서 시뮬레이션 실행
+- outputs/shallow_water_plotly_viewer.html 생성
+- HTML 안에 Plotly.newPlot, slider, frame 구조 포함
+- 기본 설정 HTML 크기 약 17 MB
+
+현재 세션에서는 인앱 브라우저 검증 도구가 노출되지 않아 스크린샷 검증은
+하지 못했습니다. 대신 HTML 구조와 생성 성공 여부를 파일 시스템에서 확인했습니다.
+
+
+7. 현재 한계
+------------
+
+- 프레임과 grid point가 많아지면 HTML 파일이 빠르게 커집니다.
+- Plotly Surface 애니메이션은 대규모 실시간 시뮬레이터가 아니라 탐색용 뷰어에 가깝습니다.
+- 물 그래픽 효과, foam, reflection, refraction은 아직 없습니다.
+- 완전한 웹 앱 UI는 아니고 단일 HTML viewer입니다.
+
+
+8. 다음 개발 방향
+-----------------
+
+Plotly viewer 다음 단계로는 다음이 좋습니다.
+
+1. HTML viewer에 파라미터/벤치마크 메타데이터 표시
+2. frame 데이터를 별도 JSON/NPY로 저장하고 HTML은 가볍게 유지
+3. Three.js 기반 더 빠른 브라우저 viewer
+4. 속도 크기, wet/dry mask, bathymetry를 토글 가능한 레이어로 만들기
+
+
+9. 한 줄 요약
+--------------
+
+shallow_water_plotly_viewer.py는 GPU로 계산한 3D 파도 장면을 브라우저에서
+직접 탐색할 수 있는 인터랙티브 HTML 뷰어로 변환합니다.
