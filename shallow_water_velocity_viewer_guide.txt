@@ -100,11 +100,10 @@ velocity가 없는 dataset을 넣으면 명확한 오류 메시지를 내고 종
 
 다음 단계로 자연스러운 후보:
 
-1. u, v 방향 벡터를 cone/quiver로 표시
-2. speed threshold 기반 high-flow 영역 강조
-3. speed와 eta를 토글하는 viewer
-4. Three.js 기반 GPU-friendly viewer로 이전
-5. 데이터셋 metadata와 color range를 HTML에 표시
+1. speed threshold 기반 high-flow 영역 강조
+2. speed와 eta를 토글하는 viewer
+3. Three.js 기반 GPU-friendly viewer로 이전
+4. 데이터셋 metadata와 color range를 HTML에 표시
 
 
 8. 한 줄 요약

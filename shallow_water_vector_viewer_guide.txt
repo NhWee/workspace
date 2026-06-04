@@ -1,0 +1,107 @@
+﻿shallow_water_vector_viewer.py 가이드
+===================================
+
+이 파일은 velocity dataset의 `u_frames`, `v_frames`를 사용해 수면 위에 방향
+벡터를 cone trace로 표시하는 Plotly HTML viewer입니다.
+
+기존 shallow_water_velocity_viewer.py가 속도 크기를 색상으로 보여줬다면, 이
+viewer는 속도 방향까지 함께 보여줍니다.
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+shallow_water_vector_viewer.py는 다음을 렌더링합니다.
+
+- 바닥 지형: z = -H(x, y)
+- 수면 높이: z = eta(x, y, t)
+- 수면 색상: speed = sqrt(u^2 + v^2)
+- 수면 위 cone vector: 방향 = (u, v, 0)
+
+Plotly HTML에는 Play/Pause 버튼과 프레임 슬라이더가 포함됩니다.
+
+
+2. 입력 데이터셋
+----------------
+
+이 viewer는 velocity가 저장된 NPZ dataset이 필요합니다.
+
+먼저 데이터셋을 만듭니다.
+
+    .\.venv\Scripts\python.exe export_wave_dataset.py --store-velocity --output outputs\wave_dataset_velocity.npz
+
+그 다음 vector viewer를 생성합니다.
+
+    .\.venv\Scripts\python.exe shallow_water_vector_viewer.py --input-npz outputs\wave_dataset_velocity.npz
+
+
+3. 주요 옵션
+------------
+
+- --input-npz: velocity dataset 경로
+- --max-surface-points: 수면과 바닥 surface 렌더링에 사용할 축당 최대 점 수
+- --vector-step: 몇 격자점마다 cone vector를 찍을지
+- --vector-scale: cone 방향 벡터의 u/v 스케일
+- --vector-size: cone 크기 기준
+- --output-dir: HTML 저장 폴더
+
+`--vector-step`이 작을수록 벡터가 촘촘해지고 HTML이 무거워집니다.
+기본값은 16이고, 더 가볍게 보려면 24 또는 32를 사용할 수 있습니다.
+
+
+4. 출력 파일
+------------
+
+기본 출력:
+
+    outputs\shallow_water_vector_viewer.html
+
+브라우저에서 열면 다음을 탐색할 수 있습니다.
+
+- 지형
+- 수면 높이
+- speed magnitude 색상
+- velocity direction cone
+- 프레임별 흐름 변화
+
+
+5. 현재 검증
+------------
+
+다음 검증을 완료했습니다.
+
+- 96 x 96 velocity smoke dataset에서 HTML 생성
+- 192 x 192 기본 velocity dataset에서 HTML 생성
+- HTML marker 확인: title, Plotly.newPlot, cone, velocity vectors, surfacecolor
+- vector sampling 확인: vector-step 24 기준 64개 cone sample
+- validate_wave_workflow.py 통과
+- pip check 통과
+
+
+6. 현재 한계
+------------
+
+- cone trace는 HTML 파일 크기와 렌더링 비용을 빠르게 키울 수 있습니다.
+- vector는 격자에서 성기게 샘플링됩니다.
+- 방향은 수평 속도 (u, v, 0)만 표시합니다.
+- streamline이나 입자 추적은 아직 없습니다.
+- Plotly 기반이라 대규모 실시간 viewer로는 한계가 있습니다.
+
+
+7. 다음 개발 방향
+-----------------
+
+다음 후보:
+
+1. speed threshold를 넘는 벡터만 표시
+2. streamline 또는 particle tracer 추가
+3. HTML 데이터와 viewer 코드를 분리해 파일 크기 줄이기
+4. Three.js 기반 viewer로 이전
+5. vector layer on/off 토글 추가
+
+
+8. 한 줄 요약
+--------------
+
+shallow_water_vector_viewer.py는 수면 높이, 속도 크기, 속도 방향을 하나의
+인터랙티브 3D Plotly 장면에서 함께 보여줍니다.
