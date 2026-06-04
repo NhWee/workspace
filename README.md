@@ -1,2 +1,25 @@
-# workspace
-This repository is for setting GPU enviornment and testing several tasks needed to high volume of calculation.
+﻿# workspace
+
+GPU 실험과 고부하 계산 프로토타입을 기록하는 작업 공간입니다.
+
+현재 목표는 PyTorch CUDA 환경에서 시작해 3차원 수면 파도 시뮬레이션으로
+점진적으로 발전시키는 것입니다.
+
+## Current Wave Simulation
+
+- `gpu_smoke_test.py`: PyTorch CUDA 동작 확인
+- `shallow_water_2d.py`: 2D height-field 파동 계산 및 2D GIF/PNG 저장
+- `shallow_water_surface_3d.py`: 같은 높이장 계산을 3D surface `z = h(x, y, t)`로 렌더링
+- `shallow_water_2d_guide.txt`: 2D height-field 모델 설명
+- `shallow_water_surface_3d_guide.txt`: 3D surface 렌더링 워크플로 설명
+
+## Run
+
+```powershell
+.\.venv\Scripts\python.exe gpu_smoke_test.py
+.\.venv\Scripts\python.exe shallow_water_2d.py
+.\.venv\Scripts\python.exe shallow_water_surface_3d.py
+```
+
+생성 결과는 `outputs/`에 저장됩니다. 이 폴더는 재생성 가능한 산출물이므로
+기본 Git 커밋에서는 제외합니다.

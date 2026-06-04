@@ -1,0 +1,140 @@
+﻿shallow_water_surface_3d.py 가이드
+==================================
+
+이 파일은 shallow_water_2d.py의 GPU height-field 계산 결과를 3D 수면으로
+렌더링하는 스크립트입니다.
+
+현재 목표인 "3차원에서 파도치는 시뮬레이션"의 첫 번째 구체적 단계입니다.
+여기서 3차원은 물 전체 부피를 voxel로 푸는 것이 아니라, 2D 격자 (x, y)
+위의 물 높이 h(x, y, t)를 z축 높이로 사용해 표면을 그리는 방식을 뜻합니다.
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+shallow_water_surface_3d.py는 다음 과정을 수행합니다.
+
+1. shallow_water_2d.py의 simulate 함수를 불러옵니다.
+2. PyTorch CUDA가 가능하면 GPU에서 height-field 파동을 계산합니다.
+3. 계산된 프레임 h(x, y, t)를 CPU로 가져옵니다.
+4. 각 프레임을 3D surface z = h(x, y, t)로 렌더링합니다.
+5. outputs 폴더에 GIF, 마지막 프레임, preview 이미지를 저장합니다.
+
+생성 파일:
+
+- shallow_water_surface_3d.gif
+- shallow_water_surface_3d_final.png
+- shallow_water_surface_3d_preview.png
+
+
+2. 2D 계산과 3D 렌더링의 관계
+-----------------------------
+
+물리 계산은 아직 2D 격자 위에서 이루어집니다.
+
+    h = h(x, y, t)
+
+하지만 시각화할 때는 이 높이를 z축으로 사용합니다.
+
+    z = h(x, y, t)
+
+즉 격자 좌표는 다음과 같은 3D 표면이 됩니다.
+
+    surface point = (x, y, h(x, y, t))
+
+이 방식은 ocean surface, terrain wave, water height map 같은 분야에서 자주
+쓰이는 출발점입니다.
+
+
+3. 왜 별도 파일로 분리했는가
+----------------------------
+
+shallow_water_2d.py는 계산과 2D 시각화에 집중합니다.
+shallow_water_surface_3d.py는 3D 렌더링에 집중합니다.
+
+이렇게 분리하면 나중에 물리 solver를 더 진지한 shallow water equations,
+FFT ocean, SPH, FLIP/PIC 등으로 교체하더라도 3D 렌더링 워크플로를 계속
+재사용할 수 있습니다.
+
+
+4. 성능을 위한 downsampling
+---------------------------
+
+시뮬레이션은 기본 256 x 256 격자에서 계산합니다.
+하지만 3D surface 렌더링은 Matplotlib이 맡기 때문에 너무 많은 점을 직접
+그리면 느려질 수 있습니다.
+
+그래서 렌더링할 때는 --max-surface-points 값에 맞춰 프레임을 downsample합니다.
+
+예를 들어 기본값은 128입니다.
+
+    256 x 256 계산 -> 128 x 128 렌더링
+
+계산은 GPU에서 비교적 빠르게 하고, 시각화는 보기 좋은 수준으로 줄여서
+저장하는 구조입니다.
+
+
+5. 실행 방법
+------------
+
+PowerShell에서 실행합니다.
+
+    cd C:\Users\Administrator\Documents\Codex\2026-06-02\gpu
+    .\.venv\Scripts\python.exe shallow_water_surface_3d.py
+
+더 큰 계산을 하고 싶으면 size와 steps를 키울 수 있습니다.
+
+    .\.venv\Scripts\python.exe shallow_water_surface_3d.py --size 512 --steps 900 --max-surface-points 160
+
+렌더링을 더 가볍게 하려면 max-surface-points를 낮춥니다.
+
+    .\.venv\Scripts\python.exe shallow_water_surface_3d.py --size 512 --max-surface-points 96
+
+
+6. 주요 옵션
+------------
+
+- --size: GPU에서 계산할 격자 크기
+- --steps: 시뮬레이션 시간 스텝 수
+- --frame-every: 몇 스텝마다 렌더링 프레임을 저장할지
+- --wave-speed: 파동 속도 계수
+- --dt: 시간 간격
+- --damping: 전역 감쇠율
+- --fps: GIF 초당 프레임 수
+- --max-surface-points: 3D surface 렌더링에 사용할 축당 최대 점 수
+- --output-dir: 결과 저장 폴더
+
+
+7. 현재 한계
+------------
+
+현재 버전은 "3D surface rendering"입니다. 즉 수면 표면이 3D로 보이지만,
+물의 전체 부피를 3차원 격자에서 푸는 3D fluid simulation은 아닙니다.
+
+현재 모델의 한계:
+
+- 속도장 u, v가 없는 단순 height-field wave model
+- 지형, 수심, 장애물 없음
+- Matplotlib 3D 렌더링이라 실시간 인터랙션에는 적합하지 않음
+- 물보라, breaking wave, foam 같은 효과 없음
+
+
+8. 다음 개발 방향
+-----------------
+
+목표에 맞는 다음 단계는 다음 순서가 좋습니다.
+
+1. h, u, v를 쓰는 진짜 shallow-water solver 구현
+2. 바닥 지형 또는 수심 bathymetry 추가
+3. 장애물과 경계 조건 추가
+4. 512, 1024 격자에서 GPU 벤치마크
+5. Plotly 또는 Three.js 기반 인터랙티브 3D 렌더링
+6. 더 무거운 모델로 확장: FFT ocean, SPH, FLIP/PIC
+
+
+9. 한 줄 요약
+--------------
+
+shallow_water_surface_3d.py는 기존 GPU 2D height-field 파동 계산을
+3D 수면 표면 애니메이션으로 렌더링해, "3차원에서 파도치는 시뮬레이션"을
+향한 첫 번째 시각적 프로토타입을 제공합니다.
