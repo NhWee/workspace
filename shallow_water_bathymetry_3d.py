@@ -56,7 +56,8 @@ def simulate_bathymetry(
     damping: float,
     device: torch.device,
     cfl: float = 0.35,
-) -> tuple[list[torch.Tensor], torch.Tensor]:
+    store_velocity: bool = False,
+) -> tuple[list[torch.Tensor], torch.Tensor] | tuple[list[torch.Tensor], torch.Tensor, list[torch.Tensor], list[torch.Tensor]]:
     dx = 2.0 / (size - 1)
     depth, wet_mask = make_bathymetry(size, device)
     if dt is None:
@@ -66,6 +67,8 @@ def simulate_bathymetry(
     v = torch.zeros_like(eta)
     edge_damping = make_edge_damping(size, width=max(8, size // 12), strength=0.10, device=device)
     frames = []
+    u_frames = []
+    v_frames = []
 
     for step in range(steps):
         surface_gradient_x = gradient_x(eta, dx)
@@ -88,7 +91,12 @@ def simulate_bathymetry(
 
         if step % frame_every == 0:
             frames.append(eta.detach().cpu())
+            if store_velocity:
+                u_frames.append(u.detach().cpu())
+                v_frames.append(v.detach().cpu())
 
+    if store_velocity:
+        return frames, depth.detach().cpu(), u_frames, v_frames
     return frames, depth.detach().cpu()
 
 

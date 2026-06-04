@@ -34,6 +34,8 @@ NPZ 파일에는 다음 항목이 들어갑니다.
 - frames: shape = (frame_count, size, size)
 - depth: shape = (size, size)
 - metadata: JSON string
+- u_frames: optional, shape = (frame_count, size, size)
+- v_frames: optional, shape = (frame_count, size, size)
 
 metadata에는 다음 정보가 들어갑니다.
 
@@ -47,6 +49,7 @@ metadata에는 다음 정보가 들어갑니다.
 - damping
 - device
 - frame_count
+- stores_velocity
 
 
 3. 실행 방법
@@ -59,6 +62,10 @@ metadata에는 다음 정보가 들어갑니다.
 명시적으로 저장 경로 지정:
 
     .\.venv\Scripts\python.exe export_wave_dataset.py --size 192 --steps 360 --frame-every 18 --output outputs\wave_dataset.npz
+
+속도장까지 함께 저장:
+
+    .\.venv\Scripts\python.exe export_wave_dataset.py --store-velocity --output outputs\wave_dataset_velocity.npz
 
 저장된 데이터셋으로 Plotly viewer 생성:
 
@@ -88,6 +95,9 @@ metadata에는 다음 정보가 들어갑니다.
 - NPZ에서 Plotly HTML 재생성
 - 192 x 192 기본 dataset 생성
 - HTML 안의 Plotly.newPlot, Frame, title marker 확인
+- --store-velocity dataset 생성
+- u_frames, v_frames 키와 metadata 확인
+- validate_wave_workflow.py에서 velocity dataset 저장/로드 확인
 
 현재 기본 데이터셋:
 
@@ -99,8 +109,8 @@ metadata에는 다음 정보가 들어갑니다.
 6. 현재 한계
 ------------
 
-- 아직 velocity field u, v는 저장하지 않습니다.
-- 현재 데이터셋은 eta frames와 depth 중심입니다.
+- velocity field u, v 저장은 옵션입니다.
+- Plotly viewer는 아직 u, v를 직접 색상/벡터로 표시하지 않습니다.
 - 대용량 데이터셋 저장 전략은 아직 단순 NPZ입니다.
 - 아주 큰 장기 시뮬레이션에는 chunked 저장 형식이 더 적합할 수 있습니다.
 
@@ -110,11 +120,12 @@ metadata에는 다음 정보가 들어갑니다.
 
 다음 확장 후보:
 
-1. u, v 속도장 저장 옵션 추가
-2. frame 단위 chunk 저장
-3. 데이터셋 metadata에 Git commit hash 기록
-4. 여러 run을 비교하는 viewer
-5. Three.js viewer가 NPZ 또는 JSON 변환 데이터를 읽게 만들기
+1. 속도 크기를 수면 색상으로 표시
+2. 흐름 벡터 또는 streamline 시각화
+3. frame 단위 chunk 저장
+4. 데이터셋 metadata에 Git commit hash 기록
+5. 여러 run을 비교하는 viewer
+6. Three.js viewer가 NPZ 또는 JSON 변환 데이터를 읽게 만들기
 
 
 8. 한 줄 요약

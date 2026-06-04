@@ -5,7 +5,7 @@ import torch
 
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_plotly_viewer import build_interactive_figure
-from wave_dataset import load_wave_dataset, save_wave_dataset
+from wave_dataset import load_wave_dataset, load_wave_dataset_with_velocity, save_wave_dataset
 
 
 def assert_condition(condition: bool, message: str) -> None:
@@ -25,7 +25,7 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(dt > 0.0, "CFL dt must be positive.")
     print(f"CFL dt: {dt:.6g}")
 
-    frames, depth = simulate_bathymetry(
+    frames, depth, u_frames, v_frames = simulate_bathymetry(
         size=size,
         steps=steps,
         frame_every=frame_every,
@@ -34,6 +34,7 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
         damping=0.9994,
         device=device,
         cfl=0.35,
+        store_velocity=True,
     )
     expected_frames = (steps + frame_every - 1) // frame_every
     assert_condition(len(frames) == expected_frames, "Unexpected frame count.")
@@ -41,6 +42,10 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(depth.shape == (size, size), "Unexpected depth shape.")
     assert_condition(torch.isfinite(frames[-1]).all().item(), "Frame contains non-finite values.")
     assert_condition(torch.isfinite(depth).all().item(), "Depth contains non-finite values.")
+    assert_condition(len(u_frames) == len(frames), "Unexpected u velocity frame count.")
+    assert_condition(len(v_frames) == len(frames), "Unexpected v velocity frame count.")
+    assert_condition(torch.isfinite(u_frames[-1]).all().item(), "U velocity contains non-finite values.")
+    assert_condition(torch.isfinite(v_frames[-1]).all().item(), "V velocity contains non-finite values.")
     print(f"Simulated frames: {len(frames)}")
 
     dataset_path = output_dir / "workflow_validation_dataset.npz"
@@ -50,14 +55,19 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
         "steps": steps,
         "frame_every": frame_every,
         "device": str(device),
+        "stores_velocity": True,
     }
-    save_wave_dataset(dataset_path, frames, depth, metadata)
+    save_wave_dataset(dataset_path, frames, depth, metadata, u_frames=u_frames, v_frames=v_frames)
 
     loaded_frames, loaded_depth, loaded_metadata = load_wave_dataset(dataset_path)
+    _, _, _, loaded_u_frames, loaded_v_frames = load_wave_dataset_with_velocity(dataset_path)
     assert_condition(len(loaded_frames) == len(frames), "Loaded frame count mismatch.")
     assert_condition(loaded_frames[0].shape == frames[0].shape, "Loaded frame shape mismatch.")
     assert_condition(loaded_depth.shape == depth.shape, "Loaded depth shape mismatch.")
     assert_condition(loaded_metadata["size"] == size, "Loaded metadata mismatch.")
+    assert_condition(loaded_metadata["stores_velocity"] is True, "Loaded velocity metadata mismatch.")
+    assert_condition(loaded_u_frames is not None and len(loaded_u_frames) == len(frames), "Loaded u velocity mismatch.")
+    assert_condition(loaded_v_frames is not None and len(loaded_v_frames) == len(frames), "Loaded v velocity mismatch.")
     print(f"Reloaded dataset: {dataset_path}")
 
     fig = build_interactive_figure(loaded_frames, loaded_depth, max_surface_points=min(48, size))
