@@ -35,11 +35,17 @@ def set_axis_style(ax, z_limit: float, compact: bool = False) -> None:
         ax.set_zlabel("height")
 
 
-def save_3d_outputs(frames: list[torch.Tensor], output_dir: Path, fps: int, max_surface_points: int) -> None:
+def save_3d_outputs(
+    frames: list[torch.Tensor],
+    output_dir: Path,
+    fps: int,
+    max_surface_points: int,
+    output_prefix: str = "shallow_water_surface_3d",
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    gif_path = output_dir / "shallow_water_surface_3d.gif"
-    png_path = output_dir / "shallow_water_surface_3d_final.png"
-    preview_path = output_dir / "shallow_water_surface_3d_preview.png"
+    gif_path = output_dir / f"{output_prefix}.gif"
+    png_path = output_dir / f"{output_prefix}_final.png"
+    preview_path = output_dir / f"{output_prefix}_preview.png"
 
     surfaces = [downsample_frame(frame, max_surface_points) for frame in frames]
     x_grid, y_grid = prepare_surface_grid(surfaces[0].shape[0])

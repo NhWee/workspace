@@ -1,0 +1,153 @@
+﻿shallow_water_uv_3d.py 가이드
+=============================
+
+이 파일은 기존 height-field wave model보다 한 단계 더 유체역학에 가까운
+GPU shallow-water prototype입니다.
+
+기존 shallow_water_2d.py는 높이 h만 사용했습니다. shallow_water_uv_3d.py는
+수면 변위 eta와 속도장 u, v를 함께 계산합니다.
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+shallow_water_uv_3d.py는 다음 변수를 2D 격자 위에 둡니다.
+
+- eta(x, y, t): 평균 수면으로부터의 높이 변화
+- u(x, y, t): x방향 수평 속도
+- v(x, y, t): y방향 수평 속도
+
+계산은 PyTorch CUDA 텐서로 수행하고, 결과 eta를 3D 표면으로 렌더링합니다.
+
+    z = eta(x, y, t)
+
+즉 시각적으로는 3D 수면 파도이며, 내부 계산은 2D shallow-water surface
+solver입니다.
+
+
+2. 사용한 방정식
+----------------
+
+현재 구현은 선형화된 shallow water equations입니다.
+
+    d eta / dt + H * (du/dx + dv/dy) = 0
+    d u   / dt = -g * d eta / dx
+    d v   / dt = -g * d eta / dy
+
+여기서:
+
+- eta: 수면 변위
+- u, v: 수평 속도장
+- H: 평균 수심 또는 mean depth
+- g: 중력 계수
+
+첫 번째 식은 질량 보존을 뜻합니다. 속도장이 퍼져나가면 수면 높이가
+낮아지고, 속도장이 모이면 수면 높이가 올라갑니다.
+
+두 번째와 세 번째 식은 압력 경사에 의한 가속을 뜻합니다. 수면이 높은 곳에서
+낮은 곳으로 흐르도록 u, v가 업데이트됩니다.
+
+
+3. 코드의 업데이트 순서
+-----------------------
+
+각 시간 스텝에서 다음 순서로 계산합니다.
+
+1. eta의 x방향 기울기로 u를 업데이트합니다.
+2. eta의 y방향 기울기로 v를 업데이트합니다.
+3. u, v의 발산으로 eta를 업데이트합니다.
+4. 전역 감쇠와 가장자리 감쇠를 적용합니다.
+5. 일정 간격마다 eta 프레임을 CPU로 복사해 렌더링용으로 저장합니다.
+
+핵심 업데이트는 다음 형태입니다.
+
+    u_next   = u   - g * dt * d_eta_dx
+    v_next   = v   - g * dt * d_eta_dy
+    eta_next = eta - H * dt * divergence(u_next, v_next)
+
+
+4. 기존 2D 파동 모델과의 차이
+-----------------------------
+
+shallow_water_2d.py:
+
+- 변수: h, h_previous
+- 모델: 2차 파동 방정식
+- 장점: 단순하고 빠름
+- 한계: 속도장이 없음
+
+shallow_water_uv_3d.py:
+
+- 변수: eta, u, v
+- 모델: 선형화된 shallow-water equations
+- 장점: 질량 보존과 수평 흐름 개념이 들어감
+- 한계: 아직 비선형 항, 지형, 장애물, 실제 수심 변화는 없음
+
+
+5. 실행 방법
+------------
+
+PowerShell에서 실행합니다.
+
+    cd C:\Users\Administrator\Documents\Codex\2026-06-02\gpu
+    .\.venv\Scripts\python.exe shallow_water_uv_3d.py
+
+더 큰 격자로 실험하려면:
+
+    .\.venv\Scripts\python.exe shallow_water_uv_3d.py --size 512 --steps 900 --max-surface-points 160
+
+렌더링을 가볍게 하려면:
+
+    .\.venv\Scripts\python.exe shallow_water_uv_3d.py --size 512 --max-surface-points 96
+
+
+6. 주요 옵션
+------------
+
+- --size: GPU에서 계산할 격자 크기
+- --steps: 시뮬레이션 스텝 수
+- --frame-every: 몇 스텝마다 렌더링 프레임을 저장할지
+- --mean-depth: 평균 수심 H
+- --gravity: 중력 계수 g
+- --dt: 시간 간격
+- --damping: 전역 감쇠율
+- --fps: GIF 초당 프레임 수
+- --max-surface-points: 3D 렌더링에 사용할 축당 최대 점 수
+- --output-dir: 결과 저장 폴더
+
+
+7. 안정성에 대한 메모
+---------------------
+
+격자 기반 유체 계산은 시간 간격 dt가 너무 크면 불안정해질 수 있습니다.
+현재 기본값은 보수적으로 잡았습니다.
+
+큰 격자 또는 큰 gravity, mean-depth를 사용할수록 dt를 작게 잡는 것이 좋습니다.
+
+예를 들어 불안정하게 값이 폭발한다면:
+
+- --dt를 낮춥니다.
+- --gravity를 낮춥니다.
+- --mean-depth를 낮춥니다.
+- --damping을 조금 더 낮춥니다.
+
+
+8. 다음 개발 방향
+-----------------
+
+이 solver를 바탕으로 다음 기능을 추가할 수 있습니다.
+
+1. 비선형 항 추가: hu, hv flux 기반 업데이트
+2. 바닥 지형 bathymetry 추가
+3. 장애물 mask와 벽 반사 조건 추가
+4. CFL 조건 기반 자동 dt 선택
+5. 512, 1024, 2048 격자 벤치마크
+6. Plotly 또는 Three.js 실시간 3D viewer
+
+
+9. 한 줄 요약
+--------------
+
+shallow_water_uv_3d.py는 eta, u, v를 함께 계산하는 GPU shallow-water solver로,
+현재 프로젝트를 단순한 height-field wave에서 더 실제적인 3D 수면 시뮬레이션
+워크플로로 한 단계 끌어올립니다.
