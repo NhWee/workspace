@@ -7,6 +7,7 @@ import torch
 
 from shallow_water_bathymetry_3d import simulate_bathymetry
 from shallow_water_surface_3d import downsample_frame, prepare_surface_grid
+from wave_dataset import load_wave_dataset
 
 
 def make_surface_trace(
@@ -128,27 +129,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--damping", type=float, default=0.9994, help="Global damping per step.")
     parser.add_argument("--max-surface-points", type=int, default=96, help="Max rendered points per surface axis.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Output directory.")
+    parser.add_argument("--input-npz", type=Path, default=None, help="Optional NPZ dataset from export_wave_dataset.py.")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-    if device.type == "cuda":
-        print(f"GPU: {torch.cuda.get_device_name(0)}")
-    dt = None if str(args.dt).lower() == "auto" else float(args.dt)
+    if args.input_npz:
+        frames, depth, metadata = load_wave_dataset(args.input_npz)
+        print(f"Loaded wave dataset: {args.input_npz}")
+        print(f"Dataset metadata: {metadata}")
+    else:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {device}")
+        if device.type == "cuda":
+            print(f"GPU: {torch.cuda.get_device_name(0)}")
+        dt = None if str(args.dt).lower() == "auto" else float(args.dt)
 
-    frames, depth = simulate_bathymetry(
-        size=args.size,
-        steps=args.steps,
-        frame_every=args.frame_every,
-        gravity=args.gravity,
-        dt=dt,
-        damping=args.damping,
-        device=device,
-        cfl=args.cfl,
-    )
+        frames, depth = simulate_bathymetry(
+            size=args.size,
+            steps=args.steps,
+            frame_every=args.frame_every,
+            gravity=args.gravity,
+            dt=dt,
+            damping=args.damping,
+            device=device,
+            cfl=args.cfl,
+        )
     fig = build_interactive_figure(frames, depth, args.max_surface_points)
 
     args.output_dir.mkdir(parents=True, exist_ok=True)

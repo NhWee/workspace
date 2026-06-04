@@ -1,0 +1,124 @@
+﻿wave_dataset.py / export_wave_dataset.py 가이드
+==============================================
+
+이 단계는 GPU 계산과 렌더링을 분리하기 위한 데이터셋 워크플로입니다.
+
+이전에는 Plotly viewer를 만들 때마다 시뮬레이션 계산을 다시 실행했습니다.
+이제는 GPU 계산 결과를 한 번 `.npz` 파일로 저장하고, 그 데이터를 여러 렌더러나
+다른 파라미터의 viewer 생성에 재사용할 수 있습니다.
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+두 파일을 추가했습니다.
+
+- wave_dataset.py
+- export_wave_dataset.py
+
+wave_dataset.py는 다음 기능을 제공합니다.
+
+- frames를 NumPy 배열로 변환
+- depth와 metadata를 함께 `.npz`로 저장
+- `.npz`에서 frames, depth, metadata를 다시 읽기
+
+export_wave_dataset.py는 GPU bathymetry solver를 실행한 뒤 결과를 데이터셋으로
+저장하는 CLI 스크립트입니다.
+
+
+2. 저장되는 데이터
+------------------
+
+NPZ 파일에는 다음 항목이 들어갑니다.
+
+- frames: shape = (frame_count, size, size)
+- depth: shape = (size, size)
+- metadata: JSON string
+
+metadata에는 다음 정보가 들어갑니다.
+
+- solver
+- size
+- steps
+- frame_every
+- gravity
+- dt
+- cfl
+- damping
+- device
+- frame_count
+
+
+3. 실행 방법
+------------
+
+기본 데이터셋 생성:
+
+    .\.venv\Scripts\python.exe export_wave_dataset.py
+
+명시적으로 저장 경로 지정:
+
+    .\.venv\Scripts\python.exe export_wave_dataset.py --size 192 --steps 360 --frame-every 18 --output outputs\wave_dataset.npz
+
+저장된 데이터셋으로 Plotly viewer 생성:
+
+    .\.venv\Scripts\python.exe shallow_water_plotly_viewer.py --input-npz outputs\wave_dataset.npz
+
+
+4. 왜 중요한가
+--------------
+
+긴 시뮬레이션이나 큰 격자 계산으로 갈수록 계산과 렌더링을 분리하는 것이 중요합니다.
+
+이 구조의 장점:
+
+- GPU 계산을 한 번만 실행해도 됨
+- 같은 데이터를 Matplotlib, Plotly, 향후 Three.js viewer에 재사용 가능
+- 렌더링 설정을 바꿔도 시뮬레이션을 다시 돌릴 필요가 없음
+- 나중에 체크포인트/비교 실험/논문식 결과 재현으로 확장하기 쉬움
+
+
+5. 현재 검증
+------------
+
+다음 검증을 완료했습니다.
+
+- 96 x 96 smoke dataset 생성
+- NPZ에서 frames/depth/metadata 읽기
+- NPZ에서 Plotly HTML 재생성
+- 192 x 192 기본 dataset 생성
+- HTML 안의 Plotly.newPlot, Frame, title marker 확인
+
+현재 기본 데이터셋:
+
+- outputs/wave_dataset.npz
+- 약 2.8 MB
+- frame_count = 20
+
+
+6. 현재 한계
+------------
+
+- 아직 velocity field u, v는 저장하지 않습니다.
+- 현재 데이터셋은 eta frames와 depth 중심입니다.
+- 대용량 데이터셋 저장 전략은 아직 단순 NPZ입니다.
+- 아주 큰 장기 시뮬레이션에는 chunked 저장 형식이 더 적합할 수 있습니다.
+
+
+7. 다음 개발 방향
+-----------------
+
+다음 확장 후보:
+
+1. u, v 속도장 저장 옵션 추가
+2. frame 단위 chunk 저장
+3. 데이터셋 metadata에 Git commit hash 기록
+4. 여러 run을 비교하는 viewer
+5. Three.js viewer가 NPZ 또는 JSON 변환 데이터를 읽게 만들기
+
+
+8. 한 줄 요약
+--------------
+
+wave_dataset.py와 export_wave_dataset.py는 GPU 파도 계산 결과를 재사용 가능한
+데이터셋으로 저장해, 시뮬레이션과 3D 렌더링을 분리하는 워크플로를 제공합니다.
