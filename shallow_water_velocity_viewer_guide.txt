@@ -1,0 +1,114 @@
+﻿shallow_water_velocity_viewer.py 가이드
+=====================================
+
+이 파일은 velocity dataset에 저장된 `u_frames`, `v_frames`를 사용해 수면을
+속도 크기(speed magnitude)로 색칠하는 Plotly HTML viewer입니다.
+
+기존 shallow_water_plotly_viewer.py는 수면과 바닥을 보여줬지만, 수면 색상은
+주로 시각적 구분을 위한 색이었습니다. 이 viewer는 수면 색상에 물리량을 담습니다.
+
+    speed = sqrt(u^2 + v^2)
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+shallow_water_velocity_viewer.py는 다음 과정을 수행합니다.
+
+1. `--store-velocity`로 저장된 NPZ dataset을 읽습니다.
+2. `frames`, `depth`, `u_frames`, `v_frames`를 로드합니다.
+3. 각 프레임마다 speed = sqrt(u^2 + v^2)를 계산합니다.
+4. 수면 geometry는 `z = eta(x, y, t)`로 둡니다.
+5. 수면 색상은 speed magnitude로 매핑합니다.
+6. 바닥 지형은 `z = -H(x, y)`로 함께 렌더링합니다.
+7. Play/Pause 버튼과 프레임 슬라이더가 있는 HTML을 저장합니다.
+
+
+2. 입력 데이터셋
+----------------
+
+이 viewer는 velocity가 저장된 dataset이 필요합니다.
+
+먼저 다음처럼 데이터셋을 만듭니다.
+
+    .\.venv\Scripts\python.exe export_wave_dataset.py --store-velocity --output outputs\wave_dataset_velocity.npz
+
+그 다음 viewer를 만듭니다.
+
+    .\.venv\Scripts\python.exe shallow_water_velocity_viewer.py --input-npz outputs\wave_dataset_velocity.npz
+
+velocity가 없는 dataset을 넣으면 명확한 오류 메시지를 내고 종료합니다.
+
+
+3. 출력 파일
+------------
+
+기본 출력:
+
+    outputs\shallow_water_velocity_viewer.html
+
+브라우저에서 열면 다음을 할 수 있습니다.
+
+- 3D scene 회전
+- 확대/축소
+- 프레임 슬라이더 이동
+- Play/Pause
+- hover로 eta와 speed 확인
+
+
+4. 시각화 의미
+--------------
+
+수면 높이:
+
+    z = eta(x, y, t)
+
+수면 색상:
+
+    color = sqrt(u(x, y, t)^2 + v(x, y, t)^2)
+
+색이 강한 곳은 수평 흐름이 큰 영역입니다. 파도가 지형을 만나며 속도장이 어디서
+강해지는지 확인하는 데 유용합니다.
+
+
+5. 현재 검증
+------------
+
+다음 검증을 완료했습니다.
+
+- 96 x 96 velocity smoke dataset 생성
+- 192 x 192 기본 velocity dataset 생성
+- NPZ 안에 `frames`, `depth`, `metadata`, `u_frames`, `v_frames` 키 확인
+- speed max/mean 계산 확인
+- velocity viewer HTML 생성
+- HTML 안의 title, Plotly.newPlot, speed, surfacecolor marker 확인
+- validate_wave_workflow.py 통과
+- pip check 통과
+
+
+6. 현재 한계
+------------
+
+- 속도 방향은 아직 화살표나 streamline으로 표시하지 않습니다.
+- speed magnitude만 수면 색상으로 표시합니다.
+- Plotly Surface animation이므로 아주 큰 grid/많은 frame에는 무거울 수 있습니다.
+- velocity는 downsample된 surface grid 기준으로 표시됩니다.
+
+
+7. 다음 개발 방향
+-----------------
+
+다음 단계로 자연스러운 후보:
+
+1. u, v 방향 벡터를 cone/quiver로 표시
+2. speed threshold 기반 high-flow 영역 강조
+3. speed와 eta를 토글하는 viewer
+4. Three.js 기반 GPU-friendly viewer로 이전
+5. 데이터셋 metadata와 color range를 HTML에 표시
+
+
+8. 한 줄 요약
+--------------
+
+shallow_water_velocity_viewer.py는 저장된 u, v 속도장을 활용해 수면을 speed
+magnitude로 색칠함으로써, 파도 표면뿐 아니라 흐름의 강도까지 볼 수 있게 합니다.

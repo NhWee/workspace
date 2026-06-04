@@ -71,6 +71,10 @@ metadata에는 다음 정보가 들어갑니다.
 
     .\.venv\Scripts\python.exe shallow_water_plotly_viewer.py --input-npz outputs\wave_dataset.npz
 
+속도장 데이터셋으로 speed-colored viewer 생성:
+
+    .\.venv\Scripts\python.exe shallow_water_velocity_viewer.py --input-npz outputs\wave_dataset_velocity.npz
+
 
 4. 왜 중요한가
 --------------
@@ -98,6 +102,7 @@ metadata에는 다음 정보가 들어갑니다.
 - --store-velocity dataset 생성
 - u_frames, v_frames 키와 metadata 확인
 - validate_wave_workflow.py에서 velocity dataset 저장/로드 확인
+- velocity dataset에서 speed-colored Plotly viewer 생성
 
 현재 기본 데이터셋:
 
@@ -110,7 +115,7 @@ metadata에는 다음 정보가 들어갑니다.
 ------------
 
 - velocity field u, v 저장은 옵션입니다.
-- Plotly viewer는 아직 u, v를 직접 색상/벡터로 표시하지 않습니다.
+- speed-colored Plotly viewer는 u, v의 크기만 사용하며 방향 벡터는 아직 표시하지 않습니다.
 - 대용량 데이터셋 저장 전략은 아직 단순 NPZ입니다.
 - 아주 큰 장기 시뮬레이션에는 chunked 저장 형식이 더 적합할 수 있습니다.
 
@@ -120,12 +125,11 @@ metadata에는 다음 정보가 들어갑니다.
 
 다음 확장 후보:
 
-1. 속도 크기를 수면 색상으로 표시
-2. 흐름 벡터 또는 streamline 시각화
-3. frame 단위 chunk 저장
-4. 데이터셋 metadata에 Git commit hash 기록
-5. 여러 run을 비교하는 viewer
-6. Three.js viewer가 NPZ 또는 JSON 변환 데이터를 읽게 만들기
+1. 흐름 벡터 또는 streamline 시각화
+2. frame 단위 chunk 저장
+3. 데이터셋 metadata에 Git commit hash 기록
+4. 여러 run을 비교하는 viewer
+5. Three.js viewer가 NPZ 또는 JSON 변환 데이터를 읽게 만들기
 
 
 8. 한 줄 요약
