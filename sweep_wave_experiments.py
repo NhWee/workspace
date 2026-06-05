@@ -1,4 +1,5 @@
 import argparse
+from html import escape
 import json
 from pathlib import Path
 from typing import Any
@@ -101,6 +102,199 @@ def write_manifest(path: Path, manifest: dict[str, Any]) -> None:
     print(f"Saved sweep manifest: {path}")
 
 
+def format_dashboard_value(value: Any) -> str:
+    if value is None:
+        return "-"
+    if isinstance(value, float):
+        return f"{value:.6g}"
+    return str(value)
+
+
+def relative_href(target: str | Path, base_dir: Path) -> str:
+    target_path = Path(target)
+    try:
+        return target_path.relative_to(base_dir).as_posix()
+    except ValueError:
+        try:
+            return target_path.resolve().relative_to(base_dir.resolve()).as_posix()
+        except ValueError:
+            return target_path.as_posix()
+
+
+def make_link(text: str, target: str | Path | None, base_dir: Path) -> str:
+    if not target:
+        return "-"
+    href = escape(relative_href(target, base_dir))
+    return f'<a href="{href}">{escape(text)}</a>'
+
+
+def render_dashboard(manifest: dict[str, Any], summaries: list[dict[str, Any]], dashboard_path: Path) -> str:
+    base_dir = dashboard_path.parent
+    outputs = manifest["outputs"]
+    runs_by_path = {str(run["dataset_path"]): run for run in manifest["runs"]}
+    metric_fields = [
+        "eta_min",
+        "eta_max",
+        "speed_max",
+        "final_l2_vs_baseline",
+        "final_linf_vs_baseline",
+        "frames_l2_mean_vs_baseline",
+        "frames_linf_max_vs_baseline",
+    ]
+
+    rows = []
+    for summary in summaries:
+        run = runs_by_path.get(summary["path"], {})
+        cells = [
+            format_dashboard_value(run.get("run_index")),
+            format_dashboard_value(run.get("sweep_value")),
+            make_link(Path(summary["path"]).name, summary["path"], base_dir),
+            format_dashboard_value(summary.get("frame_count")),
+            format_dashboard_value(summary.get("stores_velocity")),
+            *[format_dashboard_value(summary.get(field)) for field in metric_fields],
+            make_link("heatmap", summary.get("final_diff_heatmap"), base_dir),
+            make_link("csv", summary.get("frame_metrics_csv"), base_dir),
+        ]
+        rows.append("<tr>" + "".join(f"<td>{cell}</td>" for cell in cells) + "</tr>")
+
+    header_cells = [
+        "run",
+        manifest["sweep_parameter"],
+        "dataset",
+        "frames",
+        "velocity",
+        *metric_fields,
+        "heatmap",
+        "frame_csv",
+    ]
+    table_header = "<tr>" + "".join(f"<th>{escape(label)}</th>" for label in header_cells) + "</tr>"
+    frame_chart_link = make_link("Open frame metric chart", outputs["frame_metrics_chart"], base_dir)
+    comparison_link = make_link("Open comparison markdown", outputs["comparison"], base_dir)
+    manifest_link = make_link("Open manifest JSON", "manifest.json", base_dir)
+
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wave Sweep Dashboard - {escape(manifest["experiment_name"])}</title>
+  <style>
+    :root {{
+      color-scheme: light;
+      --ink: #17202a;
+      --muted: #5d6978;
+      --line: #d7dde5;
+      --panel: #f7f9fb;
+      --accent: #0f766e;
+    }}
+    body {{
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      color: var(--ink);
+      background: #ffffff;
+    }}
+    main {{
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 24px 40px;
+    }}
+    h1 {{
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }}
+    .meta {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin: 20px 0;
+    }}
+    .meta div {{
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px;
+      background: var(--panel);
+    }}
+    .label {{
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }}
+    .links {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 16px 0 24px;
+    }}
+    a {{
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }}
+    a:hover {{
+      text-decoration: underline;
+    }}
+    .table-wrap {{
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }}
+    th, td {{
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      white-space: nowrap;
+    }}
+    th {{
+      background: var(--panel);
+      color: var(--muted);
+      font-weight: 700;
+    }}
+    tr:last-child td {{
+      border-bottom: 0;
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Wave Sweep Dashboard</h1>
+    <p>{escape(manifest["experiment_name"])} compares generated shallow-water datasets against the first run as baseline.</p>
+    <section class="meta" aria-label="Sweep metadata">
+      <div><span class="label">Parameter</span>{escape(manifest["sweep_parameter"])}</div>
+      <div><span class="label">Values</span>{escape(", ".join(format_dashboard_value(value) for value in manifest["sweep_values"]))}</div>
+      <div><span class="label">Runs</span>{len(manifest["runs"])}</div>
+      <div><span class="label">Device</span>{escape(manifest["device"])}</div>
+    </section>
+    <nav class="links" aria-label="Generated outputs">
+      {frame_chart_link}
+      {comparison_link}
+      {manifest_link}
+    </nav>
+    <div class="table-wrap">
+      <table>
+        <thead>{table_header}</thead>
+        <tbody>{"".join(rows)}</tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>
+"""
+
+
+def save_dashboard(manifest: dict[str, Any], summaries: list[dict[str, Any]], output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(render_dashboard(manifest, summaries, output_path), encoding="utf-8")
+    print(f"Saved sweep dashboard: {output_path}")
+    return output_path
+
+
 def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -134,6 +328,7 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
     frame_metrics_dir = experiment_dir / "frame_metrics"
     comparison_path = experiment_dir / "comparison.md"
     frame_metrics_chart_path = experiment_dir / "frame_metrics.html"
+    dashboard_path = experiment_dir / "dashboard.html"
 
     heatmap_paths = save_final_frame_difference_heatmaps(summaries, heatmap_dir)
     frame_metric_paths = save_frame_metric_series(summaries, frame_metrics_dir)
@@ -149,12 +344,14 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
         "outputs": {
             "experiment_dir": str(experiment_dir),
             "comparison": str(comparison_path),
+            "dashboard": str(dashboard_path),
             "frame_metrics_chart": str(frame_metrics_chart_path),
             "diff_heatmaps": [str(path) for path in heatmap_paths],
             "frame_metrics_csv": [str(path) for path in frame_metric_paths],
         },
         "runs": runs,
     }
+    save_dashboard(manifest, summaries, dashboard_path)
     write_manifest(experiment_dir / "manifest.json", manifest)
     return manifest
 

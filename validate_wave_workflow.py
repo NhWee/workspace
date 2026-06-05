@@ -138,9 +138,13 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     sweep_outputs = sweep_manifest["outputs"]
     assert_condition(len(sweep_manifest["runs"]) == 2, "Sweep should create two validation runs.")
     assert_condition(Path(sweep_outputs["comparison"]).exists(), "Sweep comparison was not created.")
+    assert_condition(Path(sweep_outputs["dashboard"]).exists(), "Sweep dashboard was not created.")
     assert_condition(Path(sweep_outputs["frame_metrics_chart"]).exists(), "Sweep frame metrics chart was not created.")
     assert_condition(len(sweep_outputs["diff_heatmaps"]) == 1, "Sweep should create one validation heatmap.")
     assert_condition(len(sweep_outputs["frame_metrics_csv"]) == 1, "Sweep should create one validation frame metrics CSV.")
+    sweep_dashboard_text = Path(sweep_outputs["dashboard"]).read_text(encoding="utf-8")
+    assert_condition("Wave Sweep Dashboard" in sweep_dashboard_text, "Sweep dashboard title is missing.")
+    assert_condition("Open frame metric chart" in sweep_dashboard_text, "Sweep dashboard chart link is missing.")
     assert_condition(
         Path(sweep_manifest["runs"][0]["dataset_path"]).exists(),
         "Sweep baseline dataset was not created.",

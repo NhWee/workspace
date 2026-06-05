@@ -19,6 +19,7 @@ sweep_wave_experiments.py 가이드
 - baseline 대비 final-frame heatmap 생성
 - frame별 L2/Linf CSV 생성
 - frame별 L2/Linf Plotly chart 생성
+- sweep dashboard HTML 생성
 - 전체 비교 Markdown table 생성
 - 실험 전체 manifest JSON 저장
 
@@ -62,12 +63,16 @@ velocity field까지 저장:
 - datasets\*.npz
 - comparison.md
 - manifest.json
+- dashboard.html
 - frame_metrics.html
 - frame_metrics\*.csv
 - diff_heatmaps\*.png
 
 `manifest.json`은 실험 전체의 색인입니다. 어떤 parameter를 sweep했는지, 각 run의 dataset 경로가
 무엇인지, 비교 산출물이 어디에 있는지를 기록합니다.
+
+`dashboard.html`은 실험 전체를 사람이 읽기 쉽게 모은 첫 화면입니다. 각 run의 dataset,
+baseline 대비 metric, heatmap, frame metrics CSV, frame_metrics.html 링크를 한 번에 보여줍니다.
 
 
 4. 왜 중요한가
@@ -84,6 +89,7 @@ velocity field까지 저장:
 - 실험 조건을 명시적으로 기록
 - baseline 대비 차이를 자동 생성
 - Plotly chart로 시간별 차이를 확인
+- dashboard에서 sweep 결과 파일을 한 번에 이동
 - 대형 GPU run으로 가기 전에 작은 run으로 안정성 확인
 - 나중에 3D viewer, benchmark, chunked dataset 저장으로 확장 가능
 
@@ -95,6 +101,7 @@ velocity field까지 저장:
 
 - 두 개의 validation dataset 생성
 - comparison.md 생성
+- dashboard.html 생성
 - frame_metrics.html 생성
 - frame_metrics CSV 생성
 - final-frame difference heatmap 생성
@@ -107,7 +114,7 @@ velocity field까지 저장:
 - 한 번에 하나의 parameter만 sweep합니다.
 - multi-axis grid search는 아직 만들지 않았습니다.
 - 큰 dataset은 여전히 NPZ 단일 파일로 저장합니다.
-- sweep 결과를 한 화면에서 보는 dashboard는 아직 없습니다.
+- dashboard는 정적 HTML이며, 아직 frame_metrics.html을 한 화면 안에 embed하지 않습니다.
 
 
 7. 다음 개발 방향
