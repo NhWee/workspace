@@ -62,7 +62,8 @@ def simulate_spectral_wave(
     damping: float,
     seed: int,
     device: torch.device,
-) -> tuple[list[torch.Tensor], torch.Tensor]:
+    store_velocity: bool = False,
+) -> tuple[list[torch.Tensor], torch.Tensor] | tuple[list[torch.Tensor], torch.Tensor, list[torch.Tensor], list[torch.Tensor]]:
     spectrum, k_mag = make_initial_spectrum(
         size=size,
         domain_size=domain_size,
@@ -74,21 +75,36 @@ def simulate_spectral_wave(
         device=device,
     )
     omega = torch.sqrt(torch.clamp(gravity * k_mag, min=0.0))
+    kx_grid, ky_grid, _ = make_wave_numbers(size, domain_size, device)
+    safe_omega = torch.clamp(omega, min=1.0e-6)
     initial_eta = torch.fft.irfft2(spectrum, s=(size, size))
     normalization = torch.clamp(initial_eta.std(), min=1.0e-6)
 
     frames = []
+    u_frames = []
+    v_frames = []
     for step in range(steps):
         if step % frame_every != 0:
             continue
         elapsed = step * dt
         phase = torch.exp(1j * omega * elapsed)
         decay = damping ** step
-        eta = torch.fft.irfft2(spectrum * phase, s=(size, size))
+        eta_spectrum = spectrum * phase
+        eta = torch.fft.irfft2(eta_spectrum, s=(size, size))
         eta = eta * (wave_amplitude * decay / normalization)
         frames.append(eta.detach().cpu())
+        if store_velocity:
+            velocity_scale = wave_amplitude * decay / normalization
+            u_spectrum = -1j * gravity * kx_grid * eta_spectrum / safe_omega
+            v_spectrum = -1j * gravity * ky_grid * eta_spectrum / safe_omega
+            u = torch.fft.irfft2(u_spectrum, s=(size, size)) * velocity_scale
+            v = torch.fft.irfft2(v_spectrum, s=(size, size)) * velocity_scale
+            u_frames.append(u.detach().cpu())
+            v_frames.append(v.detach().cpu())
 
     depth = torch.ones((size, size), dtype=torch.float32) * 0.6
+    if store_velocity:
+        return frames, depth, u_frames, v_frames
     return frames, depth
 
 
@@ -107,6 +123,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--directional-spread", type=float, default=6.0, help="Higher values narrow the directional spectrum.")
     parser.add_argument("--damping", type=float, default=0.9995, help="Global spectral amplitude damping per step.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed for the initial spectrum.")
+    parser.add_argument("--store-velocity", action="store_true", help="Store approximate surface orbital u/v frames.")
     parser.add_argument("--max-surface-points", type=int, default=96, help="Max rendered points per surface axis.")
     parser.add_argument("--output", type=Path, default=Path("outputs/spectral_wave_dataset.npz"), help="Output NPZ path.")
     parser.add_argument("--viewer-output", type=Path, default=Path("outputs/spectral_wave_viewer.html"), help="Output Plotly HTML path.")
@@ -120,7 +137,7 @@ def main() -> None:
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
 
-    frames, depth = simulate_spectral_wave(
+    result = simulate_spectral_wave(
         size=args.size,
         steps=args.steps,
         frame_every=args.frame_every,
@@ -135,7 +152,14 @@ def main() -> None:
         damping=args.damping,
         seed=args.seed,
         device=device,
+        store_velocity=args.store_velocity,
     )
+    if args.store_velocity:
+        frames, depth, u_frames, v_frames = result
+    else:
+        frames, depth = result
+        u_frames = None
+        v_frames = None
     metadata = {
         "solver": "spectral_wave_surface",
         "size": args.size,
@@ -153,9 +177,9 @@ def main() -> None:
         "seed": args.seed,
         "device": str(device),
         "frame_count": len(frames),
-        "stores_velocity": False,
+        "stores_velocity": args.store_velocity,
     }
-    save_wave_dataset(args.output, frames, depth, metadata)
+    save_wave_dataset(args.output, frames, depth, metadata, u_frames=u_frames, v_frames=v_frames)
 
     args.viewer_output.parent.mkdir(parents=True, exist_ok=True)
     fig = build_interactive_figure(frames, depth, args.max_surface_points)

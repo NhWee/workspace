@@ -36,8 +36,16 @@ prototype입니다.
 4. random complex noise에 spectrum amplitude를 곱해 초기 spectrum 생성
 5. 각 저장 frame에서 `exp(i * omega * t)` phase로 spectrum 진화
 6. `torch.fft.irfft2`로 height field 복원
-7. frame list와 flat depth를 `.npz` dataset으로 저장
-8. 기존 Plotly 3D surface viewer로 HTML 생성
+7. 옵션으로 deep-water linear wave 근사의 surface orbital velocity `u, v` 복원
+8. frame list와 flat depth를 `.npz` dataset으로 저장
+9. 기존 Plotly 3D surface viewer로 HTML 생성
+
+velocity를 저장할 때는 다음 근사를 사용합니다.
+
+    u_hat(k, t) = -i * g * kx / omega(k) * eta_hat(k, t)
+    v_hat(k, t) = -i * g * ky / omega(k) * eta_hat(k, t)
+
+이는 표면 근처 orbital velocity를 보기 위한 실험용 근사입니다.
 
 
 3. 실행 방법
@@ -58,6 +66,14 @@ prototype입니다.
 방향성이 강한 파도:
 
     .\.venv\Scripts\python.exe spectral_wave_surface_3d.py --wind-direction-degrees 40 --directional-spread 12
+
+속도장까지 저장:
+
+    .\.venv\Scripts\python.exe spectral_wave_surface_3d.py --store-velocity --output outputs\spectral_wave_velocity.npz --viewer-output outputs\spectral_wave_velocity.html
+
+속도 색상 viewer 생성:
+
+    .\.venv\Scripts\python.exe shallow_water_velocity_viewer.py --input-npz outputs\spectral_wave_velocity.npz
 
 
 4. 출력 파일
@@ -90,7 +106,7 @@ NPZ에는 기존 dataset workflow와 같은 `frames`, `depth`, `metadata`가 들
 
 - deep-water dispersion만 사용합니다.
 - bathymetry, shoreline, wet/dry mask는 없습니다.
-- velocity field는 아직 저장하지 않습니다.
+- `--store-velocity`를 켜면 approximate surface orbital velocity를 `u_frames`, `v_frames`로 저장합니다.
 - wave spectrum은 간단한 Gaussian directional spectrum입니다.
 - energy conservation이나 실제 해양 스펙트럼 검증은 아직 하지 않았습니다.
 
