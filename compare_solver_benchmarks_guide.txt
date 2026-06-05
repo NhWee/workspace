@@ -1,0 +1,83 @@
+compare_solver_benchmarks.py 가이드
+==================================
+
+이 파일은 bathymetry shallow-water solver와 GPU FFT spectral wave solver를 같은 grid size 목록에서
+벤치마크하고, 결과를 하나의 CSV와 Plotly HTML chart로 비교합니다.
+
+
+1. 무엇을 비교하는가
+--------------------
+
+두 solver를 같은 size 목록에서 실행합니다.
+
+- bathymetry: variable-depth shallow-water finite-difference solver
+- spectral: GPU FFT spectral wave surface solver
+
+공통으로 비교하는 핵심 지표:
+
+- elapsed_sec
+- steps_per_sec
+- million_cell_steps_per_sec
+- max_abs_eta
+- peak_vram_gib
+
+spectral solver에서 `--spectral-store-velocity`를 켜면 velocity frame 생성 비용과 `max_speed`도 함께
+기록합니다.
+
+
+2. 실행 방법
+------------
+
+작은 테스트:
+
+    .\.venv\Scripts\python.exe compare_solver_benchmarks.py --sizes 128,256 --bathymetry-steps 120 --spectral-steps 120 --spectral-store-velocity
+
+기본 비교:
+
+    .\.venv\Scripts\python.exe compare_solver_benchmarks.py
+
+더 무겁게:
+
+    .\.venv\Scripts\python.exe compare_solver_benchmarks.py --sizes 512,1024,2048 --bathymetry-steps 1000 --spectral-steps 720 --spectral-store-velocity
+
+
+3. 출력 파일
+------------
+
+기본 출력:
+
+- outputs\wave_solver_benchmark_comparison.csv
+- outputs\wave_solver_benchmark_comparison.html
+
+CSV에는 solver별 row가 저장되고, HTML chart에는 grid size별 throughput, elapsed time,
+peak VRAM이 solver별 trace로 표시됩니다.
+
+
+4. 해석할 때 주의할 점
+----------------------
+
+`million_cell_steps_per_sec`는 같은 단위로 표시하지만, 두 solver의 한 step은 같은 계산을 뜻하지 않습니다.
+
+- bathymetry solver: finite-difference update 중심
+- spectral solver: FFT/complex spectrum update 중심
+
+따라서 이 값은 절대적인 물리 성능 비교라기보다는, 같은 GPU에서 어떤 workflow가 어느 정도의
+계산 비용을 요구하는지 보는 practical benchmark로 읽어야 합니다.
+
+
+5. 현재 검증
+------------
+
+`validate_wave_workflow.py`에서 작은 size 하나로 통합 benchmark를 실행해 다음을 확인합니다.
+
+- bathymetry/spectral 두 row 생성
+- comparison CSV 생성
+- comparison HTML 생성
+- HTML 안의 `Wave solver benchmark comparison`과 `Plotly.newPlot` 확인
+
+
+6. 한 줄 요약
+--------------
+
+`compare_solver_benchmarks.py`는 얕은물 solver와 spectral FFT solver의 GPU 성능을 한 화면에서
+비교하기 위한 통합 benchmark 리포트 도구입니다.

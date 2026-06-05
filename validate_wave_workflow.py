@@ -4,6 +4,7 @@ from pathlib import Path
 import torch
 
 from benchmark_spectral_wave import benchmark_size as benchmark_spectral_size, save_benchmark_chart
+from compare_solver_benchmarks import run_comparison as run_solver_benchmark_comparison
 from compare_wave_datasets import (
     load_dataset_summary,
     make_markdown_table,
@@ -377,6 +378,40 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("Spectral wave benchmark" in spectral_benchmark_chart_text, "Spectral benchmark chart title missing.")
     assert_condition("Plotly.newPlot" in spectral_benchmark_chart_text, "Spectral benchmark chart is missing Plotly.newPlot.")
     print("Validated spectral wave benchmark.")
+
+    comparison_rows = run_solver_benchmark_comparison(
+        argparse.Namespace(
+            sizes=str(max(32, size // 2)),
+            output_dir=output_dir / "workflow_validation_solver_benchmark",
+            bathymetry_steps=max(24, steps // 3),
+            bathymetry_gravity=1.0,
+            bathymetry_damping=0.9994,
+            bathymetry_cfl=0.35,
+            spectral_steps=max(24, steps // 3),
+            spectral_frame_every=max(6, frame_every // 2),
+            spectral_domain_size=8.0,
+            spectral_gravity=9.81,
+            spectral_dt=0.04,
+            spectral_wave_amplitude=0.06,
+            spectral_peak_wavelength=1.2,
+            spectral_bandwidth=0.32,
+            spectral_wind_direction_degrees=25.0,
+            spectral_directional_spread=6.0,
+            spectral_damping=0.9995,
+            spectral_seed=17,
+            spectral_store_velocity=True,
+        )
+    )
+    assert_condition(len(comparison_rows) == 2, "Solver benchmark comparison should contain two rows.")
+    solver_benchmark_dir = output_dir / "workflow_validation_solver_benchmark"
+    solver_benchmark_csv = solver_benchmark_dir / "wave_solver_benchmark_comparison.csv"
+    solver_benchmark_html = solver_benchmark_dir / "wave_solver_benchmark_comparison.html"
+    assert_condition(solver_benchmark_csv.exists(), "Solver benchmark comparison CSV missing.")
+    assert_condition(solver_benchmark_html.exists(), "Solver benchmark comparison HTML missing.")
+    solver_benchmark_html_text = solver_benchmark_html.read_text(encoding="utf-8")
+    assert_condition("Wave solver benchmark comparison" in solver_benchmark_html_text, "Solver benchmark chart title missing.")
+    assert_condition("Plotly.newPlot" in solver_benchmark_html_text, "Solver benchmark chart is missing Plotly.newPlot.")
+    print("Validated solver benchmark comparison.")
 
 
 def parse_args() -> argparse.Namespace:
