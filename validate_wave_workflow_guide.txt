@@ -34,6 +34,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 19. streamline tracing 확인
 20. streamline HTML marker 확인
 21. spectral wave velocity dataset과 Plotly/speed viewer 생성 확인
+22. spectral wave benchmark metric 확인
 
 
 2. 실행 방법
@@ -92,6 +93,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - streamline tracing 확인 성공
 - streamline HTML 생성 성공
 - spectral wave velocity dataset/viewer 생성 성공
+- spectral wave benchmark metric 확인 성공
 - pip check 통과
 
 

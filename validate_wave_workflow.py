@@ -3,6 +3,7 @@ from pathlib import Path
 
 import torch
 
+from benchmark_spectral_wave import benchmark_size as benchmark_spectral_size
 from compare_wave_datasets import (
     load_dataset_summary,
     make_markdown_table,
@@ -345,6 +346,32 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("GPU FFT spectral wave surface colored by speed" in spectral_velocity_html_text, "Spectral velocity HTML title missing.")
     assert_condition("Plotly.newPlot" in spectral_velocity_html_text, "Spectral velocity HTML is missing Plotly.newPlot.")
     print(f"Validated spectral wave dataset and viewer: {spectral_html_path}")
+
+    spectral_benchmark = benchmark_spectral_size(
+        size=max(32, size // 2),
+        steps=max(24, steps // 3),
+        frame_every=max(6, frame_every // 2),
+        domain_size=8.0,
+        gravity=9.81,
+        dt=0.04,
+        wave_amplitude=0.06,
+        peak_wavelength=1.2,
+        bandwidth=0.32,
+        wind_direction_degrees=25.0,
+        directional_spread=6.0,
+        damping=0.9995,
+        seed=13,
+        store_velocity=True,
+        device=device,
+    )
+    assert_condition(spectral_benchmark["elapsed_sec"] > 0.0, "Spectral benchmark elapsed time must be positive.")
+    assert_condition(
+        spectral_benchmark["million_cell_steps_per_sec"] > 0.0,
+        "Spectral benchmark throughput must be positive.",
+    )
+    assert_condition(spectral_benchmark["frame_count"] > 0, "Spectral benchmark frame count must be positive.")
+    assert_condition(spectral_benchmark["max_speed"] > 0.0, "Spectral benchmark speed must be positive.")
+    print("Validated spectral wave benchmark.")
 
 
 def parse_args() -> argparse.Namespace:

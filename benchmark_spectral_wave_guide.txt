@@ -1,0 +1,99 @@
+benchmark_spectral_wave.py 가이드
+=================================
+
+이 파일은 GPU FFT spectral wave surface solver의 계산 성능을 측정하는 벤치마크입니다.
+
+렌더링은 하지 않고 `spectral_wave_surface_3d.py`의 FFT 기반 frame 생성만 측정합니다.
+`--store-velocity`를 켜면 surface orbital velocity `u, v` 생성 비용까지 함께 잽니다.
+
+
+1. 측정하는 것
+--------------
+
+각 격자 크기마다 다음 값을 기록합니다.
+
+- device
+- size
+- steps
+- frame_every
+- frame_count
+- store_velocity
+- dt
+- elapsed_sec
+- steps_per_sec
+- million_cell_steps_per_sec
+- max_abs_eta
+- max_speed
+- peak_vram_gib
+
+`million_cell_steps_per_sec`는 solver 처리량을 대략 비교하기 위한 값입니다.
+FFT solver는 step마다 전체 grid를 spectral transform하므로, 같은 cell-step 값이라도
+finite-difference shallow-water solver와 계산 성격이 다릅니다.
+
+
+2. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe benchmark_spectral_wave.py
+
+작게 테스트:
+
+    .\.venv\Scripts\python.exe benchmark_spectral_wave.py --sizes 128,256 --steps 120
+
+속도장 생성까지 포함:
+
+    .\.venv\Scripts\python.exe benchmark_spectral_wave.py --sizes 256,512 --steps 240 --store-velocity
+
+더 무겁게:
+
+    .\.venv\Scripts\python.exe benchmark_spectral_wave.py --sizes 1024,2048 --steps 720 --store-velocity
+
+
+3. 출력 파일
+------------
+
+기본 출력:
+
+    outputs\spectral_wave_benchmark.csv
+
+CSV에는 격자 크기별 성능 row가 저장됩니다.
+
+
+4. 왜 중요한가
+--------------
+
+spectral wave solver는 3D wave surface 목표에 가까운 계산입니다. 이 벤치마크를 통해 다음을
+판단할 수 있습니다.
+
+- RTX 4060 Ti에서 어느 grid size까지 빠르게 계산되는지
+- velocity frame 생성이 비용을 얼마나 늘리는지
+- bathymetry shallow-water solver와 spectral solver의 계산 특성이 어떻게 다른지
+- 장시간 run이나 sweep으로 가기 전에 적당한 grid/step 설정이 무엇인지
+
+
+5. 현재 검증
+------------
+
+`validate_wave_workflow.py`에서 작은 spectral benchmark를 실행해 다음을 확인합니다.
+
+- elapsed_sec > 0
+- million_cell_steps_per_sec > 0
+- frame_count > 0
+- `--store-velocity` 기준 max_speed > 0
+
+
+6. 현재 한계
+------------
+
+- CSV만 저장하고 chart는 아직 만들지 않습니다.
+- FFT solver 특성상 finite-difference solver의 cell-step throughput과 직접 동등 비교하기는 어렵습니다.
+- 실제 브라우저 렌더링 비용은 포함하지 않습니다.
+
+
+7. 한 줄 요약
+--------------
+
+`benchmark_spectral_wave.py`는 GPU FFT 기반 3D wave surface solver가 큰 grid에서 어느 정도
+빠르게 동작하는지 확인하는 성능 측정 도구입니다.
