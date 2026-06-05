@@ -41,6 +41,14 @@ spectral_choppy_wave_viewer.py 가이드
 
     .\.venv\Scripts\python.exe spectral_choppy_wave_viewer.py --choppiness 1.1 --wave-amplitude 0.07
 
+foam 표시를 더 민감하게:
+
+    .\.venv\Scripts\python.exe spectral_choppy_wave_viewer.py --foam-threshold 0.012
+
+foam 표시 끄기:
+
+    .\.venv\Scripts\python.exe spectral_choppy_wave_viewer.py --hide-foam
+
 
 3. 출력 파일
 ------------
@@ -50,6 +58,7 @@ spectral_choppy_wave_viewer.py 가이드
     outputs\spectral_choppy_wave_viewer.html
 
 이 파일은 Plotly HTML입니다. 브라우저에서 회전/확대/프레임 슬라이더/Play 버튼을 사용할 수 있습니다.
+기본적으로 crest steepness가 큰 지점에는 `foam highlights` marker trace가 표시됩니다.
 
 
 4. 왜 중요한가
@@ -60,6 +69,7 @@ spectral_choppy_wave_viewer.py 가이드
 이 viewer는 다음 단계로 가는 발판입니다.
 
 - spectral wave crest를 더 날카롭게 표현
+- steepness 기반 foam/whitecap 후보를 시각적으로 표시
 - 향후 normal map, foam mask, whitecap detection과 연결
 - 렌더링용 mesh 좌표를 height-only dataset과 분리해 실험
 
@@ -68,6 +78,7 @@ spectral_choppy_wave_viewer.py 가이드
 ------------
 
 - choppy displacement는 HTML viewer에서만 계산/사용하고 dataset에 저장하지 않습니다.
+- foam은 downsampled eta gradient 기반의 시각적 marker이며, 아직 물리적 whitecap 모델은 아닙니다.
 - 과도한 `--choppiness` 값은 surface self-overlap을 만들 수 있습니다.
 - bathymetry나 shoreline은 반영하지 않습니다.
 

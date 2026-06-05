@@ -378,6 +378,7 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     choppy_html_text = choppy_html_path.read_text(encoding="utf-8")
     assert_condition("Interactive GPU FFT choppy wave surface" in choppy_html_text, "Choppy HTML title missing.")
     assert_condition("Plotly.newPlot" in choppy_html_text, "Choppy HTML is missing Plotly.newPlot.")
+    assert_condition("foam highlights" in choppy_html_text, "Choppy HTML is missing foam highlights trace.")
     print(f"Validated spectral choppy wave viewer: {choppy_html_path}")
 
     spectral_benchmark = benchmark_spectral_size(

@@ -98,14 +98,84 @@ def make_surface_trace(x_grid: np.ndarray, y_grid: np.ndarray, z_grid: np.ndarra
     )
 
 
-def build_choppy_figure(frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]], domain_size: float) -> go.Figure:
+def sample_foam_points(
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    z_grid: np.ndarray,
+    foam_threshold: float,
+    max_foam_points: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    gradient_y, gradient_x = np.gradient(z_grid)
+    steepness = np.sqrt(gradient_x * gradient_x + gradient_y * gradient_y)
+    mask = steepness >= foam_threshold
+    if not np.any(mask):
+        empty = np.array([], dtype=np.float32)
+        return empty, empty, empty, empty
+
+    foam_x = x_grid[mask]
+    foam_y = y_grid[mask]
+    foam_z = z_grid[mask]
+    foam_steepness = steepness[mask]
+    if len(foam_x) > max_foam_points:
+        order = np.argsort(foam_steepness)[-max_foam_points:]
+        foam_x = foam_x[order]
+        foam_y = foam_y[order]
+        foam_z = foam_z[order]
+        foam_steepness = foam_steepness[order]
+    return foam_x, foam_y, foam_z, foam_steepness
+
+
+def make_foam_trace(
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    z_grid: np.ndarray,
+    foam_threshold: float,
+    max_foam_points: int,
+) -> go.Scatter3d:
+    foam_x, foam_y, foam_z, foam_steepness = sample_foam_points(
+        x_grid,
+        y_grid,
+        z_grid,
+        foam_threshold,
+        max_foam_points,
+    )
+    return go.Scatter3d(
+        x=foam_x,
+        y=foam_y,
+        z=foam_z + 0.01,
+        mode="markers",
+        marker={
+            "size": 3,
+            "color": foam_steepness,
+            "colorscale": [[0.0, "#f8fbff"], [1.0, "#ffffff"]],
+            "opacity": 0.92,
+            "showscale": False,
+        },
+        name="foam highlights",
+        hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>eta=%{z:.4f}<extra>foam highlights</extra>",
+    )
+
+
+def build_choppy_figure(
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    domain_size: float,
+    show_foam: bool = True,
+    foam_threshold: float = 0.018,
+    max_foam_points: int = 900,
+) -> go.Figure:
     z_limit = max(float(np.max(np.abs(z))) for _, _, z in frames)
     z_limit = max(z_limit * 1.4, 0.08)
     half_domain = 0.55 * domain_size
 
+    def frame_traces(x: np.ndarray, y: np.ndarray, z: np.ndarray, showscale: bool) -> list:
+        traces = [make_surface_trace(x, y, z, showscale)]
+        if show_foam:
+            traces.append(make_foam_trace(x, y, z, foam_threshold, max_foam_points))
+        return traces
+
     figure_frames = [
         go.Frame(
-            data=[make_surface_trace(x, y, z, True)],
+            data=frame_traces(x, y, z, True),
             name=str(index),
         )
         for index, (x, y, z) in enumerate(frames)
@@ -119,7 +189,7 @@ def build_choppy_figure(frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
         for index in range(len(frames))
     ]
 
-    fig = go.Figure(data=[make_surface_trace(*frames[0], showscale=True)], frames=figure_frames)
+    fig = go.Figure(data=frame_traces(*frames[0], showscale=True), frames=figure_frames)
     fig.update_layout(
         title="Interactive GPU FFT choppy wave surface",
         scene={
@@ -178,6 +248,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--damping", type=float, default=0.9995, help="Global spectral amplitude damping per step.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed for the initial spectrum.")
     parser.add_argument("--choppiness", type=float, default=0.75, help="Horizontal displacement multiplier.")
+    parser.add_argument("--hide-foam", action="store_true", help="Disable steepness-based foam marker overlay.")
+    parser.add_argument("--foam-threshold", type=float, default=0.018, help="Minimum downsampled eta steepness for foam markers.")
+    parser.add_argument("--max-foam-points", type=int, default=900, help="Maximum foam markers per frame.")
     parser.add_argument("--max-surface-points", type=int, default=96, help="Max rendered points per surface axis.")
     parser.add_argument("--output", type=Path, default=Path("outputs/spectral_choppy_wave_viewer.html"), help="Output Plotly HTML path.")
     return parser.parse_args()
@@ -208,7 +281,13 @@ def main() -> None:
         max_surface_points=args.max_surface_points,
         device=device,
     )
-    fig = build_choppy_figure(frames, args.domain_size)
+    fig = build_choppy_figure(
+        frames,
+        args.domain_size,
+        show_foam=not args.hide_foam,
+        foam_threshold=args.foam_threshold,
+        max_foam_points=args.max_foam_points,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(args.output, include_plotlyjs=True, full_html=True)
     print(f"Saved choppy wave viewer: {args.output}")
