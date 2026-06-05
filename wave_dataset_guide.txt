@@ -140,6 +140,7 @@ final frame 차이 heatmap까지 생성:
 - velocity dataset에서 streamline Plotly viewer 생성
 - dataset comparison Markdown 생성
 - dataset final frame L2/Linf 비교 metric 생성
+- dataset frame-wise L2/Linf summary metric 생성
 - dataset final frame 차이 heatmap 생성
 - custom particle seed range validation 확인
 - Euler/RK2 particle integrator validation 확인
@@ -158,7 +159,7 @@ final frame 차이 heatmap까지 생성:
 - velocity field u, v 저장은 옵션입니다.
 - speed-colored Plotly viewer는 u, v의 크기만 사용하며 방향 벡터는 아직 표시하지 않습니다.
 - 대용량 데이터셋 저장 전략은 아직 단순 NPZ입니다.
-- dataset 비교 도구는 final frame 차이를 계산/시각화하지만 전체 frame-by-frame 차이는 아직 계산하지 않습니다.
+- dataset 비교 도구는 frame-wise summary metric을 계산하지만 frame별 time series 표는 아직 만들지 않습니다.
 - 아주 큰 장기 시뮬레이션에는 chunked 저장 형식이 더 적합할 수 있습니다.
 
 
@@ -170,7 +171,7 @@ final frame 차이 heatmap까지 생성:
 1. streamline 방향 화살표 추가
 2. wet/dry boundary의 reflection/sliding 처리
 3. frame 단위 chunk 저장
-4. dataset 간 frame-by-frame 차이 metric
+4. dataset 간 frame별 L2/Linf time series 저장
 5. frame-by-frame 차이 animation
 
 

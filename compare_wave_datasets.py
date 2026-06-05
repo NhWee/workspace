@@ -26,6 +26,8 @@ SUMMARY_FIELDS = [
     "final_l2_vs_baseline",
     "final_linf_vs_baseline",
     "final_diff_heatmap",
+    "frames_l2_mean_vs_baseline",
+    "frames_linf_max_vs_baseline",
 ]
 
 
@@ -63,6 +65,7 @@ def load_dataset_summary(path: Path) -> dict[str, Any]:
         "depth_min": float(depth.min()),
         "depth_max": float(depth.max()),
         "speed_max": speed_max,
+        "_frames": frames,
         "_final_frame": frames[-1],
     }
 
@@ -72,16 +75,31 @@ def add_baseline_difference_metrics(summaries: list[dict[str, Any]]) -> None:
         return
 
     baseline = summaries[0]["_final_frame"]
+    baseline_frames = summaries[0]["_frames"]
     for summary in summaries:
         final_frame = summary["_final_frame"]
         if final_frame.shape != baseline.shape:
             summary["final_l2_vs_baseline"] = None
             summary["final_linf_vs_baseline"] = None
+            summary["frames_l2_mean_vs_baseline"] = None
+            summary["frames_linf_max_vs_baseline"] = None
             continue
 
         difference = final_frame - baseline
         summary["final_l2_vs_baseline"] = float(np.sqrt(np.mean(difference * difference)))
         summary["final_linf_vs_baseline"] = float(np.max(np.abs(difference)))
+
+        frames = summary["_frames"]
+        if frames.shape != baseline_frames.shape:
+            summary["frames_l2_mean_vs_baseline"] = None
+            summary["frames_linf_max_vs_baseline"] = None
+            continue
+
+        frame_difference = frames - baseline_frames
+        frame_l2 = np.sqrt(np.mean(frame_difference * frame_difference, axis=(1, 2)))
+        frame_linf = np.max(np.abs(frame_difference), axis=(1, 2))
+        summary["frames_l2_mean_vs_baseline"] = float(frame_l2.mean())
+        summary["frames_linf_max_vs_baseline"] = float(frame_linf.max())
 
 
 def safe_stem(path_text: str) -> str:
