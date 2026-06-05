@@ -16,6 +16,7 @@ from shallow_water_particle_animation_viewer import build_particle_animation_fig
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
 from shallow_water_plotly_viewer import build_interactive_figure
 from shallow_water_streamline_viewer import build_streamline_figure, trace_streamlines
+from spectral_wave_surface_3d import simulate_spectral_wave
 from sweep_wave_experiments import parse_float_list, run_sweep
 from wave_dataset import load_wave_dataset, load_wave_dataset_with_velocity, save_wave_dataset
 
@@ -272,6 +273,51 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("Streamlines over speed-colored 3D wave surface" in streamline_html_text, "Streamline HTML is missing viewer title.")
     assert_condition("streamlines" in streamline_html_text, "Streamline HTML is missing streamlines trace.")
     print(f"Validated streamline HTML: {streamline_html_path}")
+
+    spectral_frames, spectral_depth = simulate_spectral_wave(
+        size=max(32, size // 2),
+        steps=max(24, steps // 3),
+        frame_every=max(6, frame_every // 2),
+        domain_size=8.0,
+        gravity=9.81,
+        dt=0.04,
+        wave_amplitude=0.06,
+        peak_wavelength=1.2,
+        bandwidth=0.32,
+        wind_direction_degrees=25.0,
+        directional_spread=6.0,
+        damping=0.9995,
+        seed=11,
+        device=device,
+    )
+    assert_condition(len(spectral_frames) > 0, "Spectral wave produced no frames.")
+    assert_condition(torch.isfinite(spectral_frames[-1]).all().item(), "Spectral wave frame contains non-finite values.")
+    assert_condition(spectral_depth.shape == spectral_frames[0].shape, "Spectral wave depth shape mismatch.")
+    spectral_dataset_path = output_dir / "workflow_validation_spectral_dataset.npz"
+    save_wave_dataset(
+        spectral_dataset_path,
+        spectral_frames,
+        spectral_depth,
+        {
+            "solver": "spectral_wave_surface_validation",
+            "size": spectral_frames[0].shape[0],
+            "steps": max(24, steps // 3),
+            "frame_every": max(6, frame_every // 2),
+            "device": str(device),
+            "stores_velocity": False,
+        },
+    )
+    spectral_loaded_frames, spectral_loaded_depth, spectral_metadata = load_wave_dataset(spectral_dataset_path)
+    assert_condition(spectral_metadata["solver"] == "spectral_wave_surface_validation", "Spectral metadata mismatch.")
+    assert_condition(spectral_loaded_depth.shape == spectral_loaded_frames[0].shape, "Loaded spectral depth shape mismatch.")
+    spectral_fig = build_interactive_figure(spectral_loaded_frames, spectral_loaded_depth, max_surface_points=min(48, size))
+    spectral_fig.update_layout(title="Interactive GPU FFT spectral wave surface")
+    spectral_html_path = output_dir / "workflow_validation_spectral_viewer.html"
+    spectral_fig.write_html(spectral_html_path, include_plotlyjs=True, full_html=True)
+    spectral_html_text = spectral_html_path.read_text(encoding="utf-8")
+    assert_condition("Interactive GPU FFT spectral wave surface" in spectral_html_text, "Spectral HTML title missing.")
+    assert_condition("Plotly.newPlot" in spectral_html_text, "Spectral HTML is missing Plotly.newPlot.")
+    print(f"Validated spectral wave dataset and viewer: {spectral_html_path}")
 
 
 def parse_args() -> argparse.Namespace:

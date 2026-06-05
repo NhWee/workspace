@@ -33,6 +33,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 18. particle animation HTML marker 확인
 19. streamline tracing 확인
 20. streamline HTML marker 확인
+21. spectral wave dataset과 Plotly viewer 생성 확인
 
 
 2. 실행 방법
@@ -61,6 +62,8 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - workflow_validation_viewer.html
 - workflow_validation_particle_animation_viewer.html
 - workflow_validation_streamline_viewer.html
+- workflow_validation_spectral_dataset.npz
+- workflow_validation_spectral_viewer.html
 
 이 파일들은 검증 산출물이며 재생성 가능합니다.
 
@@ -87,6 +90,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - particle trails/particles marker 확인 성공
 - streamline tracing 확인 성공
 - streamline HTML 생성 성공
+- spectral wave dataset/viewer 생성 성공
 - pip check 통과
 
 
@@ -96,6 +100,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 다음 상황에서 실행하면 좋습니다.
 
 - solver 코드를 수정한 뒤
+- spectral wave surface 코드를 수정한 뒤
 - 데이터셋 저장 형식을 수정한 뒤
 - Plotly viewer를 수정한 뒤
 - 새 패키지를 설치하거나 환경을 바꾼 뒤

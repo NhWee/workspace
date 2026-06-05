@@ -1,0 +1,114 @@
+spectral_wave_surface_3d.py 가이드
+==================================
+
+이 파일은 GPU FFT를 이용해 3차원 수면 표면 `z = eta(x, y, t)`를 만드는 spectral wave
+prototype입니다.
+
+기존 shallow-water solver는 수심과 유속을 직접 시간 적분합니다. 반면 이 solver는 주파수 공간의
+파동 성분을 만들고, 각 성분을 deep-water dispersion relation으로 시간 진화시킨 뒤 inverse FFT로
+수면 높이장을 복원합니다.
+
+
+1. 사용한 모델
+--------------
+
+핵심 변수:
+
+- eta(x, y, t): 수면 높이
+- k = (kx, ky): 2D wave number
+- |k|: wave number magnitude
+- omega(k): 각 wave component의 angular frequency
+
+사용한 dispersion relation:
+
+    omega(k) = sqrt(g * |k|)
+
+이는 deep-water gravity wave의 단순 모델입니다. 얕은물 bathymetry solver처럼 해안/섬/마른 셀을
+다루지는 않지만, 넓은 수면에서 방향성을 가진 파도 표면을 빠르게 만드는 데 적합합니다.
+
+
+2. 계산 흐름
+------------
+
+1. `torch.fft.rfftfreq`, `torch.fft.fftfreq`로 frequency grid 생성
+2. dominant wavelength 근처에 Gaussian spectrum 생성
+3. wind direction에 가까운 wave number에 더 큰 weight 부여
+4. random complex noise에 spectrum amplitude를 곱해 초기 spectrum 생성
+5. 각 저장 frame에서 `exp(i * omega * t)` phase로 spectrum 진화
+6. `torch.fft.irfft2`로 height field 복원
+7. frame list와 flat depth를 `.npz` dataset으로 저장
+8. 기존 Plotly 3D surface viewer로 HTML 생성
+
+
+3. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe spectral_wave_surface_3d.py
+
+작은 테스트 실행:
+
+    .\.venv\Scripts\python.exe spectral_wave_surface_3d.py --size 96 --steps 90 --frame-every 15 --output outputs\spectral_test.npz --viewer-output outputs\spectral_test.html
+
+더 긴 파장:
+
+    .\.venv\Scripts\python.exe spectral_wave_surface_3d.py --peak-wavelength 1.8 --wave-amplitude 0.07
+
+방향성이 강한 파도:
+
+    .\.venv\Scripts\python.exe spectral_wave_surface_3d.py --wind-direction-degrees 40 --directional-spread 12
+
+
+4. 출력 파일
+------------
+
+기본 출력:
+
+- outputs\spectral_wave_dataset.npz
+- outputs\spectral_wave_viewer.html
+
+NPZ에는 기존 dataset workflow와 같은 `frames`, `depth`, `metadata`가 들어갑니다.
+따라서 `compare_wave_datasets.py`나 기존 Plotly viewer 입력으로도 재사용할 수 있습니다.
+
+
+5. 왜 중요한가
+--------------
+
+이 solver는 목표인 3D wave surface에 더 가까운 방향입니다.
+
+장점:
+
+- FFT 기반이라 큰 grid에서도 GPU로 빠르게 계산 가능
+- 방향성 있는 파도 표면을 자연스럽게 생성
+- 기존 dataset, viewer, comparison workflow와 호환
+- 향후 Phillips/JONSWAP spectrum, choppy wave, normal map, foam mask로 확장 가능
+
+
+6. 현재 한계
+------------
+
+- deep-water dispersion만 사용합니다.
+- bathymetry, shoreline, wet/dry mask는 없습니다.
+- velocity field는 아직 저장하지 않습니다.
+- wave spectrum은 간단한 Gaussian directional spectrum입니다.
+- energy conservation이나 실제 해양 스펙트럼 검증은 아직 하지 않았습니다.
+
+
+7. 다음 개발 방향
+-----------------
+
+다음 후보:
+
+1. Phillips 또는 JONSWAP spectrum
+2. horizontal displacement를 더한 choppy wave surface
+3. spectral velocity/normal field 저장
+4. foam/whitecap mask 생성
+5. spectral solver benchmark와 sweep workflow 연결
+
+
+8. 한 줄 요약
+--------------
+
+`spectral_wave_surface_3d.py`는 GPU FFT로 방향성 있는 3D 파도 표면을 생성하고, 기존 dataset과
+Plotly viewer workflow로 바로 이어지는 spectral wave prototype입니다.
