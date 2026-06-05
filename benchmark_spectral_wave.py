@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 import torch
+import plotly.graph_objects as go
 
 from spectral_wave_surface_3d import simulate_spectral_wave
 
@@ -85,6 +86,72 @@ def benchmark_size(
     }
 
 
+def make_benchmark_chart(rows: list[dict[str, float | int | str | bool]]) -> go.Figure:
+    sizes = [row["size"] for row in rows]
+    labels = [f"{row['size']} x {row['size']}" for row in rows]
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=sizes,
+            y=[row["million_cell_steps_per_sec"] for row in rows],
+            mode="lines+markers",
+            name="Throughput",
+            customdata=labels,
+            hovertemplate="grid=%{customdata}<br>throughput=%{y:.4g}M cell-steps/s<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=sizes,
+            y=[row["elapsed_sec"] for row in rows],
+            mode="lines+markers",
+            name="Elapsed seconds",
+            yaxis="y2",
+            customdata=labels,
+            hovertemplate="grid=%{customdata}<br>elapsed=%{y:.4g}s<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=sizes,
+            y=[row["peak_vram_gib"] for row in rows],
+            mode="lines+markers",
+            name="Peak VRAM GiB",
+            yaxis="y3",
+            customdata=labels,
+            hovertemplate="grid=%{customdata}<br>peak VRAM=%{y:.4g}GiB<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        title="Spectral wave benchmark",
+        xaxis={"title": "Grid size"},
+        yaxis={"title": "M cell-steps/s"},
+        yaxis2={
+            "title": "Elapsed seconds",
+            "overlaying": "y",
+            "side": "right",
+        },
+        yaxis3={
+            "title": "Peak VRAM GiB",
+            "overlaying": "y",
+            "side": "right",
+            "anchor": "free",
+            "position": 0.94,
+        },
+        hovermode="x unified",
+        margin={"l": 72, "r": 120, "t": 56, "b": 48},
+    )
+    return fig
+
+
+def save_benchmark_chart(rows: list[dict[str, float | int | str | bool]], output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig = make_benchmark_chart(rows)
+    fig.write_html(output_path, include_plotlyjs=True, full_html=True)
+    print(f"Saved spectral benchmark chart: {output_path}")
+    return output_path
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Benchmark the GPU FFT spectral wave surface solver.")
     parser.add_argument("--sizes", default="256,512,1024", help="Comma-separated grid sizes.")
@@ -139,6 +206,8 @@ def main() -> None:
         writer = csv.DictWriter(file, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
+    chart_path = args.output_dir / "spectral_wave_benchmark.html"
+    save_benchmark_chart(rows, chart_path)
 
     for row in rows:
         print(

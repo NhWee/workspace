@@ -3,7 +3,7 @@ from pathlib import Path
 
 import torch
 
-from benchmark_spectral_wave import benchmark_size as benchmark_spectral_size
+from benchmark_spectral_wave import benchmark_size as benchmark_spectral_size, save_benchmark_chart
 from compare_wave_datasets import (
     load_dataset_summary,
     make_markdown_table,
@@ -371,6 +371,11 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     )
     assert_condition(spectral_benchmark["frame_count"] > 0, "Spectral benchmark frame count must be positive.")
     assert_condition(spectral_benchmark["max_speed"] > 0.0, "Spectral benchmark speed must be positive.")
+    spectral_benchmark_chart_path = output_dir / "workflow_validation_spectral_benchmark.html"
+    save_benchmark_chart([spectral_benchmark], spectral_benchmark_chart_path)
+    spectral_benchmark_chart_text = spectral_benchmark_chart_path.read_text(encoding="utf-8")
+    assert_condition("Spectral wave benchmark" in spectral_benchmark_chart_text, "Spectral benchmark chart title missing.")
+    assert_condition("Plotly.newPlot" in spectral_benchmark_chart_text, "Spectral benchmark chart is missing Plotly.newPlot.")
     print("Validated spectral wave benchmark.")
 
 

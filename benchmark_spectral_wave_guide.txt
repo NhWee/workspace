@@ -58,7 +58,12 @@ finite-difference shallow-water solver와 계산 성격이 다릅니다.
 
     outputs\spectral_wave_benchmark.csv
 
-CSV에는 격자 크기별 성능 row가 저장됩니다.
+추가로 Plotly HTML chart도 저장합니다.
+
+    outputs\spectral_wave_benchmark.html
+
+CSV에는 격자 크기별 성능 row가 저장되고, HTML chart에는 grid size별 throughput,
+elapsed time, peak VRAM이 함께 표시됩니다.
 
 
 4. 왜 중요한가
@@ -87,7 +92,7 @@ spectral wave solver는 3D wave surface 목표에 가까운 계산입니다. 이
 6. 현재 한계
 ------------
 
-- CSV만 저장하고 chart는 아직 만들지 않습니다.
+- chart는 성능 지표 중심이며, 아직 bathymetry benchmark와 한 화면에서 비교하지 않습니다.
 - FFT solver 특성상 finite-difference solver의 cell-step throughput과 직접 동등 비교하기는 어렵습니다.
 - 실제 브라우저 렌더링 비용은 포함하지 않습니다.
 
