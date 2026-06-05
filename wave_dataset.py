@@ -1,4 +1,6 @@
 import json
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +12,43 @@ def frames_to_numpy(frames: list[torch.Tensor]) -> np.ndarray:
     return np.stack([frame.detach().cpu().numpy().astype(np.float32) for frame in frames])
 
 
+def get_git_metadata(repo_dir: Path | None = None) -> dict[str, Any]:
+    repo_dir = repo_dir or Path(__file__).resolve().parent
+    metadata: dict[str, Any] = {
+        "git_commit": None,
+        "git_is_dirty": None,
+    }
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return metadata
+
+    metadata["git_commit"] = commit
+    metadata["git_is_dirty"] = bool(status.strip())
+    return metadata
+
+
+def enrich_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+    enriched = dict(metadata)
+    enriched.setdefault("created_at_utc", datetime.now(timezone.utc).isoformat(timespec="seconds"))
+    for key, value in get_git_metadata().items():
+        enriched.setdefault(key, value)
+    return enriched
+
+
 def save_wave_dataset(
     path: Path,
     frames: list[torch.Tensor],
@@ -19,10 +58,11 @@ def save_wave_dataset(
     v_frames: list[torch.Tensor] | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    enriched_metadata = enrich_metadata(metadata)
     arrays = {
         "frames": frames_to_numpy(frames),
         "depth": depth.detach().cpu().numpy().astype(np.float32),
-        "metadata": json.dumps(metadata, ensure_ascii=False),
+        "metadata": json.dumps(enriched_metadata, ensure_ascii=False),
     }
     if u_frames is not None:
         arrays["u_frames"] = frames_to_numpy(u_frames)

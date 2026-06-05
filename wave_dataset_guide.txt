@@ -50,6 +50,12 @@ metadata에는 다음 정보가 들어갑니다.
 - device
 - frame_count
 - stores_velocity
+- created_at_utc
+- git_commit
+- git_is_dirty
+
+`created_at_utc`는 dataset 생성 시각입니다. `git_commit`은 저장 시점의 Git commit hash이며,
+`git_is_dirty`는 저장할 때 작업 트리에 커밋되지 않은 변경이 있었는지를 나타냅니다.
 
 
 3. 실행 방법
@@ -112,6 +118,7 @@ streamline viewer 생성:
 
 - 96 x 96 smoke dataset 생성
 - NPZ에서 frames/depth/metadata 읽기
+- metadata provenance 필드 확인
 - NPZ에서 Plotly HTML 재생성
 - 192 x 192 기본 dataset 생성
 - HTML 안의 Plotly.newPlot, Frame, title marker 확인
@@ -151,9 +158,8 @@ streamline viewer 생성:
 1. streamline 방향 화살표 추가
 2. wet/dry boundary의 reflection/sliding 처리
 3. frame 단위 chunk 저장
-4. 데이터셋 metadata에 Git commit hash 기록
-5. 여러 run을 비교하는 viewer
-6. 임의 shape 또는 mask 기반 seed 배치
+4. 여러 run을 비교하는 viewer
+5. 임의 shape 또는 mask 기반 seed 배치
 
 
 8. 한 줄 요약
