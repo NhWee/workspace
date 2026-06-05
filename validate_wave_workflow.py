@@ -4,6 +4,7 @@ from pathlib import Path
 import torch
 
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
+from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_plotly_viewer import build_interactive_figure
 from wave_dataset import load_wave_dataset, load_wave_dataset_with_velocity, save_wave_dataset
 
@@ -77,6 +78,26 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("Plotly.newPlot" in html_text, "HTML is missing Plotly.newPlot.")
     assert_condition("Interactive bathymetry + GPU wave surface" in html_text, "HTML is missing viewer title.")
     print(f"Validated Plotly HTML: {html_path}")
+
+    particle_html_path = output_dir / "workflow_validation_particle_animation_viewer.html"
+    particle_fig = build_particle_animation_figure(
+        loaded_frames,
+        loaded_depth,
+        loaded_u_frames,
+        loaded_v_frames,
+        max_surface_points=min(48, size),
+        seed_count_x=3,
+        seed_count_y=4,
+        particle_step_scale=0.55,
+        trail_length=4,
+        frame_duration_ms=90,
+    )
+    particle_fig.write_html(particle_html_path, include_plotlyjs=True, full_html=True)
+    particle_html_text = particle_html_path.read_text(encoding="utf-8")
+    assert_condition("Animated particles over speed-colored 3D wave surface" in particle_html_text, "Particle HTML is missing viewer title.")
+    assert_condition("particle trails" in particle_html_text, "Particle HTML is missing trails trace.")
+    assert_condition("particles" in particle_html_text, "Particle HTML is missing marker trace.")
+    print(f"Validated particle animation HTML: {particle_html_path}")
 
 
 def parse_args() -> argparse.Namespace:

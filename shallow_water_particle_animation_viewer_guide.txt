@@ -1,0 +1,111 @@
+﻿shallow_water_particle_animation_viewer.py 가이드
+===============================================
+
+이 파일은 velocity dataset에 저장된 `u_frames`, `v_frames`를 사용해서 particle을 시간에 따라
+움직이는 3D Plotly animation viewer입니다.
+
+기존 `shallow_water_particle_viewer.py`가 전체 particle path를 정적인 선으로 한 번에 보여준다면,
+이 viewer는 프레임별 수면, 속도 색상, particle 위치, 짧은 trail을 함께 애니메이션합니다.
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+shallow_water_particle_animation_viewer.py는 다음 일을 합니다.
+
+1. velocity가 포함된 NPZ dataset을 읽습니다.
+2. 수면 frame과 velocity frame을 downsample합니다.
+3. seed particle을 왼쪽 유입 영역에 배치합니다.
+4. 각 frame의 u, v velocity field를 따라 particle 위치를 업데이트합니다.
+5. 각 animation frame마다 bathymetry, speed-colored water surface, particle trail, current particle marker를 갱신합니다.
+
+따라서 브라우저에서 Play 버튼이나 slider를 사용하면 파도 표면 위로 흐름 입자가 움직이는
+모습을 볼 수 있습니다.
+
+
+2. 실행 방법
+------------
+
+먼저 velocity dataset을 만듭니다.
+
+    .\.venv\Scripts\python.exe export_wave_dataset.py --store-velocity --output outputs\wave_dataset_velocity.npz
+
+그 다음 animation viewer를 생성합니다.
+
+    .\.venv\Scripts\python.exe shallow_water_particle_animation_viewer.py --input-npz outputs\wave_dataset_velocity.npz
+
+
+3. 주요 옵션
+------------
+
+- --input-npz: velocity dataset 경로
+- --max-surface-points: 수면/바닥 렌더링 해상도
+- --seed-count-x: x방향 seed 개수
+- --seed-count-y: y방향 seed 개수
+- --particle-step-scale: particle advection 스케일
+- --trail-length: 각 particle이 남기는 짧은 꼬리 길이
+- --frame-duration-ms: Play 버튼 재생 속도
+- --output-dir: HTML 저장 폴더
+
+
+4. 출력 파일
+------------
+
+기본 출력:
+
+    outputs\shallow_water_particle_animation_viewer.html
+
+브라우저에서 열면 speed-colored 3D 수면 위에 particle marker와 trail이 frame별로 움직입니다.
+
+
+5. 왜 중요한가
+--------------
+
+3D wave simulation에서는 단순히 수면 높이 `eta`만 보는 것보다, 흐름이 어디로 이동하는지
+함께 보는 것이 중요합니다.
+
+이 viewer는 다음을 확인하는 데 유용합니다.
+
+- 파동이 지형을 만나며 흐름 방향을 바꾸는지
+- 빠른 흐름 영역과 particle 이동이 일관되는지
+- particle advection이 다음 단계의 streamline 또는 유체 시각화로 확장 가능한지
+
+
+6. 현재 검증
+------------
+
+다음 검증을 완료했습니다.
+
+- velocity dataset에서 animated Plotly HTML 생성
+- HTML marker 확인: title, Plotly.newPlot, particle trails, particles, surfacecolor
+- validate_wave_workflow.py에서 particle animation HTML 생성 확인
+- py_compile 통과
+- pip check 통과
+
+
+7. 현재 한계
+------------
+
+- particle 이동은 진단용 explicit advection입니다.
+- velocity frame 사이 시간 보간은 아직 없습니다.
+- particle은 wet/dry boundary를 정교하게 반사하거나 제거하지 않습니다.
+- Plotly animation은 실험용 시각화에 적합하며, 더 많은 particle이나 긴 frame에서는 Three.js가 더 적합합니다.
+
+
+8. 다음 개발 방향
+-----------------
+
+다음 후보:
+
+1. Three.js/WebGL 기반 실시간 particle animation
+2. wet/dry mask를 고려한 particle 처리
+3. 더 정교한 Runge-Kutta particle integrator
+4. 여러 seed 패턴 지원
+5. 수면과 particle을 같은 시간축으로 더 촘촘하게 보간
+
+
+9. 한 줄 요약
+--------------
+
+shallow_water_particle_animation_viewer.py는 저장된 velocity field를 이용해 particle이
+3D 파도 표면 위에서 시간에 따라 흐르는 모습을 보여주는 animation viewer입니다.
