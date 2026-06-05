@@ -87,6 +87,10 @@ metadata에는 다음 정보가 들어갑니다.
 
     .\.venv\Scripts\python.exe shallow_water_particle_animation_viewer.py --input-npz outputs\wave_dataset_velocity.npz
 
+streamline viewer 생성:
+
+    .\.venv\Scripts\python.exe shallow_water_streamline_viewer.py --input-npz outputs\wave_dataset_velocity.npz
+
 
 4. 왜 중요한가
 --------------
@@ -118,6 +122,7 @@ metadata에는 다음 정보가 들어갑니다.
 - velocity dataset에서 cone vector Plotly viewer 생성
 - velocity dataset에서 particle trace Plotly viewer 생성
 - velocity dataset에서 particle animation Plotly viewer 생성
+- velocity dataset에서 streamline Plotly viewer 생성
 - custom particle seed range validation 확인
 - Euler/RK2 particle integrator validation 확인
 - particle wet/dry clipping validation 확인
@@ -143,7 +148,7 @@ metadata에는 다음 정보가 들어갑니다.
 
 다음 확장 후보:
 
-1. streamline 시각화
+1. streamline 방향 화살표 추가
 2. wet/dry boundary의 reflection/sliding 처리
 3. frame 단위 chunk 저장
 4. 데이터셋 metadata에 Git commit hash 기록

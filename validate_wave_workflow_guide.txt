@@ -29,6 +29,8 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 14. HTML 안에 Plotly.newPlot과 title marker가 있는지 확인
 15. particle animation figure 생성
 16. particle animation HTML marker 확인
+17. streamline tracing 확인
+18. streamline HTML marker 확인
 
 
 2. 실행 방법
@@ -51,6 +53,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - workflow_validation_dataset.npz
 - workflow_validation_viewer.html
 - workflow_validation_particle_animation_viewer.html
+- workflow_validation_streamline_viewer.html
 
 이 파일들은 검증 산출물이며 재생성 가능합니다.
 
@@ -72,6 +75,8 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - HTML marker 확인 성공
 - particle animation HTML 생성 성공
 - particle trails/particles marker 확인 성공
+- streamline tracing 확인 성공
+- streamline HTML 생성 성공
 - pip check 통과
 
 

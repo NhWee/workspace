@@ -1,0 +1,122 @@
+﻿shallow_water_streamline_viewer.py 가이드
+========================================
+
+이 파일은 velocity dataset의 한 frame을 골라, 그 순간의 `u, v` velocity field를 따라가는
+streamline을 3D Plotly 장면으로 보여주는 viewer입니다.
+
+particle animation이 시간에 따른 seed 이동을 보여준다면, streamline viewer는 선택한 한 순간의
+흐름 구조를 더 조밀하게 보여줍니다.
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+shallow_water_streamline_viewer.py는 다음 일을 합니다.
+
+1. velocity가 포함된 NPZ dataset을 읽습니다.
+2. 선택한 frame의 수면 `eta`, velocity `u, v`, bathymetry `H`를 사용합니다.
+3. 지정한 x/y 범위에 streamline seed를 배치합니다.
+4. Euler 또는 RK2 midpoint 방식으로 velocity field를 따라 streamline을 적분합니다.
+5. 이동 후보 위치가 dry cell이면 이전 wet 위치를 유지합니다.
+6. speed-colored water surface 위에 streamline을 3D line으로 표시합니다.
+7. 바닥 지형은 z = -H(x, y)로 함께 표시합니다.
+
+
+2. 실행 방법
+------------
+
+먼저 velocity dataset을 만듭니다.
+
+    .\.venv\Scripts\python.exe export_wave_dataset.py --store-velocity --output outputs\wave_dataset_velocity.npz
+
+그 다음 streamline viewer를 생성합니다.
+
+    .\.venv\Scripts\python.exe shallow_water_streamline_viewer.py --input-npz outputs\wave_dataset_velocity.npz
+
+특정 frame을 보고 싶으면:
+
+    .\.venv\Scripts\python.exe shallow_water_streamline_viewer.py --input-npz outputs\wave_dataset_velocity.npz --frame-index 10
+
+
+3. 주요 옵션
+------------
+
+- --input-npz: velocity dataset 경로
+- --max-surface-points: 수면/바닥 렌더링 해상도
+- --frame-index: 시각화할 frame 번호, 음수는 뒤에서부터 선택
+- --seed-count-x: x방향 streamline seed 개수
+- --seed-count-y: y방향 streamline seed 개수
+- --seed-x-min, --seed-x-max: seed x 좌표 범위
+- --seed-y-min, --seed-y-max: seed y 좌표 범위
+- --streamline-steps: streamline당 적분 step 개수
+- --streamline-step-scale: streamline 적분 step 크기
+- --particle-integrator: 적분 방식, euler 또는 rk2
+- --wet-depth-threshold: wet cell로 취급할 최소 수심
+- --allow-dry-streamlines: dry cell 진입 차단을 끄는 옵션
+- --output-dir: HTML 저장 폴더
+
+
+4. 출력 파일
+------------
+
+기본 출력:
+
+    outputs\shallow_water_streamline_viewer.html
+
+브라우저에서 열면 speed-colored 3D 수면 위에 streamline들이 표시됩니다.
+
+
+5. 시각화 의미
+--------------
+
+streamline은 선택한 frame에서 velocity field가 가리키는 흐름 방향을 누적해 그린 선입니다.
+
+이 viewer는 다음을 보는 데 유용합니다.
+
+- 특정 순간의 흐름 구조
+- 얕은 지형과 섬 주변에서 흐름이 휘는 방향
+- speed-colored surface와 streamline 방향의 일관성
+- particle animation을 보기 전에 seed 배치를 고르는 기준
+
+
+6. 현재 검증
+------------
+
+다음 검증을 완료했습니다.
+
+- velocity dataset에서 streamline Plotly HTML 생성
+- HTML marker 확인: title, Plotly.newPlot, streamlines, surfacecolor
+- custom seed range validation 확인
+- RK2 streamline tracing validation 확인
+- wet/dry clipping validation 확인
+- validate_wave_workflow.py에서 streamline HTML 생성 확인
+- py_compile 통과
+- pip check 통과
+
+
+7. 현재 한계
+------------
+
+- streamline은 선택한 한 frame의 velocity field만 사용합니다.
+- velocity frame 사이 시간 보간은 없습니다.
+- dry cell 진입은 차단하지만, 해안선 sliding이나 반사는 아직 없습니다.
+- 대규모 seed 수와 긴 streamline에는 Plotly보다 WebGL 전용 viewer가 더 적합합니다.
+
+
+8. 다음 개발 방향
+-----------------
+
+다음 후보:
+
+1. streamline 방향 화살표 추가
+2. seed mask 또는 임의 shape 기반 seed 배치
+3. 시간 frame별 streamline animation
+4. Three.js/WebGL 기반 실시간 streamline/particle viewer
+5. RK4 또는 시간 보간 기반 integrator
+
+
+9. 한 줄 요약
+--------------
+
+shallow_water_streamline_viewer.py는 선택한 velocity frame의 흐름 구조를 3D 수면 위에
+streamline으로 표시해, 파도 시뮬레이션의 순간적인 유동 패턴을 읽게 해줍니다.

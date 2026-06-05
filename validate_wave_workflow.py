@@ -7,6 +7,7 @@ from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulat
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
 from shallow_water_plotly_viewer import build_interactive_figure
+from shallow_water_streamline_viewer import build_streamline_figure, trace_streamlines
 from wave_dataset import load_wave_dataset, load_wave_dataset_with_velocity, save_wave_dataset
 
 
@@ -100,6 +101,24 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
         assert_condition(float(sampled_wet.min()) >= 0.5, f"{integrator} particle path entered a dry cell.")
     print("Validated Euler/RK2 wet/dry particle clipping.")
 
+    streamline_x, streamline_y, _ = trace_streamlines(
+        loaded_frames[-1],
+        loaded_depth,
+        loaded_u_frames[-1],
+        loaded_v_frames[-1],
+        custom_seed_x,
+        custom_seed_y,
+        streamline_steps=8,
+        step_scale=0.18,
+        wet_depth_threshold=0.055,
+        block_dry_cells=True,
+        integrator="rk2",
+    )
+    sampled_streamline_wet = bilinear_sample(wet_mask, streamline_x.reshape(-1), streamline_y.reshape(-1))
+    assert_condition(streamline_x.shape == (9, len(custom_seed_x)), "Streamline shape mismatch.")
+    assert_condition(float(sampled_streamline_wet.min()) >= 0.5, "Streamline entered a dry cell.")
+    print("Validated streamline tracing.")
+
     fig = build_interactive_figure(loaded_frames, loaded_depth, max_surface_points=min(48, size))
     html_path = output_dir / "workflow_validation_viewer.html"
     fig.write_html(html_path, include_plotlyjs=True, full_html=True)
@@ -134,6 +153,32 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("particle trails" in particle_html_text, "Particle HTML is missing trails trace.")
     assert_condition("particles" in particle_html_text, "Particle HTML is missing marker trace.")
     print(f"Validated particle animation HTML: {particle_html_path}")
+
+    streamline_html_path = output_dir / "workflow_validation_streamline_viewer.html"
+    streamline_fig = build_streamline_figure(
+        loaded_frames,
+        loaded_depth,
+        loaded_u_frames,
+        loaded_v_frames,
+        max_surface_points=min(48, size),
+        frame_index=-1,
+        seed_count_x=3,
+        seed_count_y=4,
+        seed_x_min=-0.75,
+        seed_x_max=-0.65,
+        seed_y_min=-0.30,
+        seed_y_max=0.30,
+        streamline_steps=8,
+        streamline_step_scale=0.18,
+        wet_depth_threshold=0.055,
+        block_dry_cells=True,
+        particle_integrator="rk2",
+    )
+    streamline_fig.write_html(streamline_html_path, include_plotlyjs=True, full_html=True)
+    streamline_html_text = streamline_html_path.read_text(encoding="utf-8")
+    assert_condition("Streamlines over speed-colored 3D wave surface" in streamline_html_text, "Streamline HTML is missing viewer title.")
+    assert_condition("streamlines" in streamline_html_text, "Streamline HTML is missing streamlines trace.")
+    print(f"Validated streamline HTML: {streamline_html_path}")
 
 
 def parse_args() -> argparse.Namespace:
