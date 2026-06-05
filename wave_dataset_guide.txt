@@ -118,6 +118,7 @@ metadata에는 다음 정보가 들어갑니다.
 - velocity dataset에서 cone vector Plotly viewer 생성
 - velocity dataset에서 particle trace Plotly viewer 생성
 - velocity dataset에서 particle animation Plotly viewer 생성
+- custom particle seed range validation 확인
 - Euler/RK2 particle integrator validation 확인
 - particle wet/dry clipping validation 확인
 
@@ -147,7 +148,7 @@ metadata에는 다음 정보가 들어갑니다.
 3. frame 단위 chunk 저장
 4. 데이터셋 metadata에 Git commit hash 기록
 5. 여러 run을 비교하는 viewer
-6. RK4 또는 시간 보간 기반 particle integrator
+6. 임의 shape 또는 mask 기반 seed 배치
 
 
 8. 한 줄 요약

@@ -74,6 +74,14 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
 
     wet_mask = make_wet_mask(loaded_depth, wet_depth_threshold=0.055)
     seed_x, seed_y = make_particle_seeds(3, 4)
+    custom_seed_x, custom_seed_y = make_particle_seeds(2, 3, x_min=-0.75, x_max=-0.65, y_min=-0.30, y_max=0.30)
+    assert_condition(custom_seed_x.shape == (6,), "Custom seed x shape mismatch.")
+    assert_condition(custom_seed_y.shape == (6,), "Custom seed y shape mismatch.")
+    assert_condition(abs(float(custom_seed_x.min()) + 0.75) < 1.0e-12, "Custom seed x min mismatch.")
+    assert_condition(abs(float(custom_seed_x.max()) + 0.65) < 1.0e-12, "Custom seed x max mismatch.")
+    assert_condition(abs(float(custom_seed_y.min()) + 0.30) < 1.0e-12, "Custom seed y min mismatch.")
+    assert_condition(abs(float(custom_seed_y.max()) - 0.30) < 1.0e-12, "Custom seed y max mismatch.")
+    print("Validated custom particle seed ranges.")
     for integrator in ("euler", "rk2"):
         paths_x, paths_y, _ = trace_particles(
             loaded_frames,
@@ -109,6 +117,10 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
         max_surface_points=min(48, size),
         seed_count_x=3,
         seed_count_y=4,
+        seed_x_min=-0.88,
+        seed_x_max=-0.58,
+        seed_y_min=-0.62,
+        seed_y_max=0.62,
         particle_step_scale=0.55,
         wet_depth_threshold=0.055,
         block_dry_cells=True,

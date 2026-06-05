@@ -91,6 +91,10 @@ def build_particle_animation_figure(
     max_surface_points: int,
     seed_count_x: int,
     seed_count_y: int,
+    seed_x_min: float,
+    seed_x_max: float,
+    seed_y_min: float,
+    seed_y_max: float,
     particle_step_scale: float,
     wet_depth_threshold: float,
     block_dry_cells: bool,
@@ -106,7 +110,14 @@ def build_particle_animation_figure(
     bed_surface = -downsample_frame(depth, max_surface_points)
     x_grid, y_grid = prepare_surface_grid(water_surfaces[0].shape[0])
 
-    seed_x, seed_y = make_particle_seeds(seed_count_x, seed_count_y)
+    seed_x, seed_y = make_particle_seeds(
+        seed_count_x,
+        seed_count_y,
+        seed_x_min,
+        seed_x_max,
+        seed_y_min,
+        seed_y_max,
+    )
     paths_x, paths_y, paths_z = trace_particles(
         frames,
         u_frames,
@@ -212,6 +223,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-surface-points", type=int, default=96, help="Max rendered points per surface axis.")
     parser.add_argument("--seed-count-x", type=int, default=6, help="Number of particle seeds along x.")
     parser.add_argument("--seed-count-y", type=int, default=8, help="Number of particle seeds along y.")
+    parser.add_argument("--seed-x-min", type=float, default=-0.88, help="Minimum seed x coordinate.")
+    parser.add_argument("--seed-x-max", type=float, default=-0.58, help="Maximum seed x coordinate.")
+    parser.add_argument("--seed-y-min", type=float, default=-0.62, help="Minimum seed y coordinate.")
+    parser.add_argument("--seed-y-max", type=float, default=0.62, help="Maximum seed y coordinate.")
     parser.add_argument("--particle-step-scale", type=float, default=0.55, help="Scale factor for particle advection.")
     parser.add_argument("--wet-depth-threshold", type=float, default=0.055, help="Minimum depth treated as wet.")
     parser.add_argument("--allow-dry-particles", action="store_true", help="Allow particles to move into dry cells.")
@@ -246,6 +261,10 @@ def main() -> None:
         args.max_surface_points,
         args.seed_count_x,
         args.seed_count_y,
+        args.seed_x_min,
+        args.seed_x_max,
+        args.seed_y_min,
+        args.seed_y_max,
         args.particle_step_scale,
         args.wet_depth_threshold,
         not args.allow_dry_particles,
