@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -24,6 +25,7 @@ SUMMARY_FIELDS = [
     "speed_max",
     "final_l2_vs_baseline",
     "final_linf_vs_baseline",
+    "final_diff_heatmap",
 ]
 
 
@@ -82,6 +84,41 @@ def add_baseline_difference_metrics(summaries: list[dict[str, Any]]) -> None:
         summary["final_linf_vs_baseline"] = float(np.max(np.abs(difference)))
 
 
+def safe_stem(path_text: str) -> str:
+    return Path(path_text).stem.replace(" ", "_")
+
+
+def save_final_frame_difference_heatmaps(summaries: list[dict[str, Any]], output_dir: Path) -> list[Path]:
+    add_baseline_difference_metrics(summaries)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if not summaries:
+        return []
+
+    baseline = summaries[0]["_final_frame"]
+    saved_paths = []
+    for index, summary in enumerate(summaries):
+        summary["final_diff_heatmap"] = None
+        if index == 0:
+            continue
+        final_frame = summary["_final_frame"]
+        if final_frame.shape != baseline.shape:
+            continue
+
+        difference = np.abs(final_frame - baseline)
+        output_path = output_dir / f"final_diff_{index:02d}_{safe_stem(summary['path'])}.png"
+        fig, ax = plt.subplots(figsize=(7, 6), dpi=120)
+        image = ax.imshow(difference, cmap="magma", origin="lower", interpolation="nearest")
+        ax.set_title(f"Final frame abs difference vs baseline: {Path(summary['path']).name}")
+        ax.set_axis_off()
+        fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04, label="abs eta difference")
+        fig.savefig(output_path, bbox_inches="tight")
+        plt.close(fig)
+        summary["final_diff_heatmap"] = str(output_path)
+        saved_paths.append(output_path)
+
+    return saved_paths
+
+
 def format_value(value: Any) -> str:
     if value is None:
         return "-"
@@ -121,12 +158,22 @@ def parse_args() -> argparse.Namespace:
         default=Path("outputs/wave_dataset_comparison.md"),
         help="Markdown output path.",
     )
+    parser.add_argument(
+        "--diff-heatmap-dir",
+        type=Path,
+        default=None,
+        help="Optional directory for final-frame absolute difference heatmaps.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     summaries = [load_dataset_summary(path) for path in args.datasets]
+    if args.diff_heatmap_dir:
+        saved_paths = save_final_frame_difference_heatmaps(summaries, args.diff_heatmap_dir)
+        for path in saved_paths:
+            print(f"Saved final-frame difference heatmap: {path}")
     table_text = make_markdown_table(summaries)
     print(table_text)
     write_summary(args.output, table_text)

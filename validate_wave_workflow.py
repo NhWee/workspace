@@ -3,7 +3,12 @@ from pathlib import Path
 
 import torch
 
-from compare_wave_datasets import load_dataset_summary, make_markdown_table, write_summary
+from compare_wave_datasets import (
+    load_dataset_summary,
+    make_markdown_table,
+    save_final_frame_difference_heatmaps,
+    write_summary,
+)
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
@@ -81,9 +86,16 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(dataset_summary["frame_count"] == len(frames), "Dataset summary frame count mismatch.")
     assert_condition(dataset_summary["stores_velocity"] is True, "Dataset summary velocity mismatch.")
     comparison_path = output_dir / "workflow_validation_dataset_comparison.md"
-    comparison_table = make_markdown_table([dataset_summary])
+    duplicate_summary = load_dataset_summary(dataset_path)
+    heatmap_dir = output_dir / "workflow_validation_diff_heatmaps"
+    heatmap_paths = save_final_frame_difference_heatmaps([dataset_summary, duplicate_summary], heatmap_dir)
+    assert_condition(len(heatmap_paths) == 1, "Expected one validation difference heatmap.")
+    assert_condition(heatmap_paths[0].exists(), "Validation difference heatmap was not created.")
+    assert_condition(duplicate_summary["final_l2_vs_baseline"] == 0.0, "Duplicate final L2 metric must be zero.")
+    comparison_table = make_markdown_table([dataset_summary, duplicate_summary])
     assert_condition("frame_count" in comparison_table, "Dataset comparison table is missing frame_count.")
     assert_condition("final_l2_vs_baseline" in comparison_table, "Dataset comparison table is missing final L2 metric.")
+    assert_condition("final_diff_heatmap" in comparison_table, "Dataset comparison table is missing heatmap column.")
     assert_condition(dataset_summary["final_l2_vs_baseline"] == 0.0, "Baseline final L2 metric must be zero.")
     assert_condition(dataset_summary["final_linf_vs_baseline"] == 0.0, "Baseline final Linf metric must be zero.")
     write_summary(comparison_path, comparison_table)
