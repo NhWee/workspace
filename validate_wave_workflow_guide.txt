@@ -22,16 +22,17 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 7. NPZ dataset 다시 읽기
 8. metadata, provenance, shape 확인
 9. dataset comparison summary, final/frame-wise metric, heatmap, CSV, chart 생성
-10. u_frames, v_frames velocity data 확인
-11. custom particle seed range 확인
-12. Euler/RK2 particle integrator와 wet/dry clipping 확인
-13. Plotly interactive figure 생성
-14. HTML 저장
-15. HTML 안에 Plotly.newPlot과 title marker가 있는지 확인
-16. particle animation figure 생성
-17. particle animation HTML marker 확인
-18. streamline tracing 확인
-19. streamline HTML marker 확인
+10. 작은 parameter sweep 실행 및 manifest/comparison/chart 생성 확인
+11. u_frames, v_frames velocity data 확인
+12. custom particle seed range 확인
+13. Euler/RK2 particle integrator와 wet/dry clipping 확인
+14. Plotly interactive figure 생성
+15. HTML 저장
+16. HTML 안에 Plotly.newPlot과 title marker가 있는지 확인
+17. particle animation figure 생성
+18. particle animation HTML marker 확인
+19. streamline tracing 확인
+20. streamline HTML marker 확인
 
 
 2. 실행 방법
@@ -56,6 +57,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - workflow_validation_diff_heatmaps/
 - workflow_validation_frame_metrics/
 - workflow_validation_frame_metrics.html
+- workflow_validation_sweeps/
 - workflow_validation_viewer.html
 - workflow_validation_particle_animation_viewer.html
 - workflow_validation_streamline_viewer.html
@@ -75,6 +77,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - NPZ 저장/불러오기 성공
 - metadata provenance 필드 확인 성공
 - dataset comparison summary, final/frame-wise metric, heatmap, CSV, chart 생성 성공
+- parameter sweep manifest/comparison/chart 생성 성공
 - u/v velocity frames 저장/불러오기 성공
 - custom particle seed range 확인 성공
 - Euler/RK2 particle integrator와 wet/dry clipping 확인 성공

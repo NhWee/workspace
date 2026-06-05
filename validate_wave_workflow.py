@@ -16,6 +16,7 @@ from shallow_water_particle_animation_viewer import build_particle_animation_fig
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
 from shallow_water_plotly_viewer import build_interactive_figure
 from shallow_water_streamline_viewer import build_streamline_figure, trace_streamlines
+from sweep_wave_experiments import parse_float_list, run_sweep
 from wave_dataset import load_wave_dataset, load_wave_dataset_with_velocity, save_wave_dataset
 
 
@@ -117,6 +118,34 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(duplicate_summary["frames_linf_max_vs_baseline"] == 0.0, "Duplicate frame Linf metric must be zero.")
     write_summary(comparison_path, comparison_table)
     print(f"Validated dataset comparison summary: {comparison_path}")
+
+    sweep_manifest = run_sweep(
+        argparse.Namespace(
+            experiment_name="workflow_validation_sweep",
+            parameter="damping",
+            values=parse_float_list("0.9993,0.9994"),
+            size=max(32, size // 2),
+            steps=max(24, steps // 3),
+            frame_every=max(6, frame_every // 2),
+            gravity=1.0,
+            dt="auto",
+            cfl=0.35,
+            damping=0.9994,
+            store_velocity=False,
+            output_dir=output_dir / "workflow_validation_sweeps",
+        )
+    )
+    sweep_outputs = sweep_manifest["outputs"]
+    assert_condition(len(sweep_manifest["runs"]) == 2, "Sweep should create two validation runs.")
+    assert_condition(Path(sweep_outputs["comparison"]).exists(), "Sweep comparison was not created.")
+    assert_condition(Path(sweep_outputs["frame_metrics_chart"]).exists(), "Sweep frame metrics chart was not created.")
+    assert_condition(len(sweep_outputs["diff_heatmaps"]) == 1, "Sweep should create one validation heatmap.")
+    assert_condition(len(sweep_outputs["frame_metrics_csv"]) == 1, "Sweep should create one validation frame metrics CSV.")
+    assert_condition(
+        Path(sweep_manifest["runs"][0]["dataset_path"]).exists(),
+        "Sweep baseline dataset was not created.",
+    )
+    print("Validated parameter sweep workflow.")
 
     wet_mask = make_wet_mask(loaded_depth, wet_depth_threshold=0.055)
     seed_x, seed_y = make_particle_seeds(3, 4)
