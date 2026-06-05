@@ -16,6 +16,7 @@ sweep_wave_experiments.py 가이드
 - 지정한 parameter 값마다 bathymetry shallow-water simulation 실행
 - 각 run을 `.npz` dataset으로 저장
 - dataset metadata에 experiment name, run index, sweep parameter/value 기록
+- 각 run의 elapsed time, throughput, peak VRAM 기록
 - baseline 대비 final-frame heatmap 생성
 - frame별 L2/Linf CSV 생성
 - frame별 L2/Linf Plotly chart 생성
@@ -72,7 +73,8 @@ velocity field까지 저장:
 무엇인지, 비교 산출물이 어디에 있는지를 기록합니다.
 
 `dashboard.html`은 실험 전체를 사람이 읽기 쉽게 모은 첫 화면입니다. 각 run의 dataset,
-baseline 대비 metric, heatmap, frame metrics CSV, frame_metrics.html 링크를 한 번에 보여줍니다.
+elapsed time, throughput, peak VRAM, baseline 대비 metric, heatmap, frame metrics CSV,
+frame_metrics.html 링크를 한 번에 보여줍니다.
 
 
 4. 왜 중요한가
@@ -87,6 +89,7 @@ baseline 대비 metric, heatmap, frame metrics CSV, frame_metrics.html 링크를
 이 구조의 장점:
 
 - 실험 조건을 명시적으로 기록
+- GPU 실행 시간과 처리량을 run별로 비교
 - baseline 대비 차이를 자동 생성
 - Plotly chart로 시간별 차이를 확인
 - dashboard에서 sweep 결과 파일을 한 번에 이동
@@ -103,6 +106,7 @@ baseline 대비 metric, heatmap, frame metrics CSV, frame_metrics.html 링크를
 - comparison.md 생성
 - dashboard.html 생성
 - frame_metrics.html 생성
+- elapsed time, throughput, peak VRAM metric 확인
 - frame_metrics CSV 생성
 - final-frame difference heatmap 생성
 - baseline dataset 경로가 manifest에 기록되고 실제 파일이 존재
@@ -123,7 +127,7 @@ baseline 대비 metric, heatmap, frame metrics CSV, frame_metrics.html 링크를
 다음 후보:
 
 1. multi-parameter grid sweep
-2. benchmark time/throughput을 manifest에 함께 기록
+2. benchmark time/throughput chart 추가
 3. frame별 차이 peak 자동 탐지
 4. sweep dashboard HTML 생성
 5. 대형 run용 chunked dataset 저장

@@ -137,6 +137,13 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     )
     sweep_outputs = sweep_manifest["outputs"]
     assert_condition(len(sweep_manifest["runs"]) == 2, "Sweep should create two validation runs.")
+    assert_condition(sweep_manifest["runs"][0]["elapsed_sec"] > 0.0, "Sweep elapsed time must be positive.")
+    assert_condition(sweep_manifest["runs"][0]["steps_per_sec"] > 0.0, "Sweep steps/sec must be positive.")
+    assert_condition(
+        sweep_manifest["runs"][0]["million_cell_steps_per_sec"] > 0.0,
+        "Sweep throughput must be positive.",
+    )
+    assert_condition("peak_vram_gib" in sweep_manifest["runs"][0], "Sweep peak VRAM metric is missing.")
     assert_condition(Path(sweep_outputs["comparison"]).exists(), "Sweep comparison was not created.")
     assert_condition(Path(sweep_outputs["dashboard"]).exists(), "Sweep dashboard was not created.")
     assert_condition(Path(sweep_outputs["frame_metrics_chart"]).exists(), "Sweep frame metrics chart was not created.")
@@ -145,6 +152,9 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     sweep_dashboard_text = Path(sweep_outputs["dashboard"]).read_text(encoding="utf-8")
     assert_condition("Wave Sweep Dashboard" in sweep_dashboard_text, "Sweep dashboard title is missing.")
     assert_condition("Open frame metric chart" in sweep_dashboard_text, "Sweep dashboard chart link is missing.")
+    assert_condition("million_cell_steps_per_sec" in sweep_dashboard_text, "Sweep dashboard throughput metric is missing.")
+    sweep_comparison_text = Path(sweep_outputs["comparison"]).read_text(encoding="utf-8")
+    assert_condition("elapsed_sec" in sweep_comparison_text, "Sweep comparison elapsed metric is missing.")
     assert_condition(
         Path(sweep_manifest["runs"][0]["dataset_path"]).exists(),
         "Sweep baseline dataset was not created.",

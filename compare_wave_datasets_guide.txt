@@ -25,6 +25,10 @@ compare_wave_datasets.py는 다음 정보를 읽습니다.
 - eta_min / eta_max
 - depth_min / depth_max
 - speed_max
+- elapsed_sec
+- steps_per_sec
+- million_cell_steps_per_sec
+- peak_vram_gib
 - final_l2_vs_baseline
 - final_linf_vs_baseline
 - final_diff_heatmap
@@ -119,6 +123,7 @@ comparison table, manifest 생성을 한 번에 실행합니다.
 - 같은 frame tensor shape dataset의 frame-wise L2/Linf Plotly chart 저장
 - 같은 grid shape dataset의 final frame difference heatmap 저장
 - parameter sweep 결과 비교 산출물 생성
+- parameter sweep run별 성능 metric 표시
 - Markdown comparison table 생성
 - validate_wave_workflow.py에서 comparison markdown 생성 확인
 - py_compile 통과

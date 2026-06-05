@@ -2,6 +2,7 @@ import argparse
 from html import escape
 import json
 from pathlib import Path
+import time
 from typing import Any
 
 import torch
@@ -57,6 +58,11 @@ def run_single_experiment(
     parameters: dict[str, Any],
     device: torch.device,
 ) -> dict[str, Any]:
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats()
+        torch.cuda.synchronize()
+
+    start_time = time.perf_counter()
     result = simulate_bathymetry(
         size=parameters["size"],
         steps=parameters["steps"],
@@ -68,6 +74,10 @@ def run_single_experiment(
         cfl=parameters["cfl"],
         store_velocity=parameters["store_velocity"],
     )
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    elapsed_sec = time.perf_counter() - start_time
+
     if parameters["store_velocity"]:
         frames, depth, u_frames, v_frames = result
     else:
@@ -91,6 +101,10 @@ def run_single_experiment(
         "device": str(device),
         "frame_count": len(frames),
         "stores_velocity": parameters["store_velocity"],
+        "elapsed_sec": elapsed_sec,
+        "steps_per_sec": parameters["steps"] / elapsed_sec,
+        "million_cell_steps_per_sec": parameters["size"] * parameters["size"] * parameters["steps"] / elapsed_sec / 1_000_000,
+        "peak_vram_gib": float(torch.cuda.max_memory_allocated() / 1024**3) if device.type == "cuda" else 0.0,
     }
     save_wave_dataset(output_path, frames, depth, metadata, u_frames=u_frames, v_frames=v_frames)
     return enrich_metadata(metadata) | {"dataset_path": str(output_path)}
@@ -141,6 +155,12 @@ def render_dashboard(manifest: dict[str, Any], summaries: list[dict[str, Any]], 
         "frames_l2_mean_vs_baseline",
         "frames_linf_max_vs_baseline",
     ]
+    performance_fields = [
+        "elapsed_sec",
+        "steps_per_sec",
+        "million_cell_steps_per_sec",
+        "peak_vram_gib",
+    ]
 
     rows = []
     for summary in summaries:
@@ -151,6 +171,7 @@ def render_dashboard(manifest: dict[str, Any], summaries: list[dict[str, Any]], 
             make_link(Path(summary["path"]).name, summary["path"], base_dir),
             format_dashboard_value(summary.get("frame_count")),
             format_dashboard_value(summary.get("stores_velocity")),
+            *[format_dashboard_value(run.get(field)) for field in performance_fields],
             *[format_dashboard_value(summary.get(field)) for field in metric_fields],
             make_link("heatmap", summary.get("final_diff_heatmap"), base_dir),
             make_link("csv", summary.get("frame_metrics_csv"), base_dir),
@@ -163,6 +184,7 @@ def render_dashboard(manifest: dict[str, Any], summaries: list[dict[str, Any]], 
         "dataset",
         "frames",
         "velocity",
+        *performance_fields,
         *metric_fields,
         "heatmap",
         "frame_csv",
