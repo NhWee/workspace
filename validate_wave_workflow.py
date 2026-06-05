@@ -3,6 +3,7 @@ from pathlib import Path
 
 import torch
 
+from compare_wave_datasets import load_dataset_summary, make_markdown_table, write_summary
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
@@ -75,6 +76,15 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(loaded_u_frames is not None and len(loaded_u_frames) == len(frames), "Loaded u velocity mismatch.")
     assert_condition(loaded_v_frames is not None and len(loaded_v_frames) == len(frames), "Loaded v velocity mismatch.")
     print(f"Reloaded dataset: {dataset_path}")
+
+    dataset_summary = load_dataset_summary(dataset_path)
+    assert_condition(dataset_summary["frame_count"] == len(frames), "Dataset summary frame count mismatch.")
+    assert_condition(dataset_summary["stores_velocity"] is True, "Dataset summary velocity mismatch.")
+    comparison_path = output_dir / "workflow_validation_dataset_comparison.md"
+    comparison_table = make_markdown_table([dataset_summary])
+    assert_condition("frame_count" in comparison_table, "Dataset comparison table is missing frame_count.")
+    write_summary(comparison_path, comparison_table)
+    print(f"Validated dataset comparison summary: {comparison_path}")
 
     wet_mask = make_wet_mask(loaded_depth, wet_depth_threshold=0.055)
     seed_x, seed_y = make_particle_seeds(3, 4)

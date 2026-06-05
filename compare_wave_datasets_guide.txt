@@ -1,0 +1,107 @@
+﻿compare_wave_datasets.py 가이드
+===============================
+
+이 파일은 여러 `.npz` wave dataset의 metadata와 기본 수치 범위를 Markdown 표로 비교하는 CLI입니다.
+
+시뮬레이션 크기, frame 개수, velocity 저장 여부, Git commit, 수면/수심/속도 범위를 한눈에 볼 수
+있어서 여러 run을 비교하거나 재현성을 확인할 때 유용합니다.
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+compare_wave_datasets.py는 다음 정보를 읽습니다.
+
+- dataset path
+- size
+- steps
+- frame_every
+- frame_count
+- stores_velocity
+- device
+- created_at_utc
+- git_commit
+- git_is_dirty
+- eta_min / eta_max
+- depth_min / depth_max
+- speed_max
+
+
+2. 실행 방법
+------------
+
+하나의 dataset 요약:
+
+    .\.venv\Scripts\python.exe compare_wave_datasets.py outputs\wave_dataset_velocity.npz
+
+여러 dataset 비교:
+
+    .\.venv\Scripts\python.exe compare_wave_datasets.py outputs\wave_dataset.npz outputs\wave_dataset_velocity.npz
+
+출력 경로 지정:
+
+    .\.venv\Scripts\python.exe compare_wave_datasets.py outputs\wave_dataset_velocity.npz --output outputs\my_comparison.md
+
+
+3. 출력 파일
+------------
+
+기본 출력:
+
+    outputs\wave_dataset_comparison.md
+
+같은 Markdown table이 터미널에도 출력됩니다.
+
+
+4. 왜 중요한가
+--------------
+
+3D wave workflow에서는 같은 solver로 여러 size, steps, seed, viewer 설정을 실험하게 됩니다.
+
+이 도구는 다음을 빠르게 확인하게 해줍니다.
+
+- 어떤 dataset이 velocity field를 포함하는지
+- 어느 commit에서 dataset이 만들어졌는지
+- run 사이 수면 높이, 수심, 최대 속도가 크게 달라졌는지
+- 비교할 viewer 입력을 잘 골랐는지
+
+
+5. 현재 검증
+------------
+
+다음 검증을 완료했습니다.
+
+- metadata provenance field 읽기
+- frame/depth 기본 수치 범위 계산
+- velocity dataset의 speed_max 계산
+- Markdown comparison table 생성
+- validate_wave_workflow.py에서 comparison markdown 생성 확인
+- py_compile 통과
+- pip check 통과
+
+
+6. 현재 한계
+------------
+
+- 비교 결과는 요약 표이며, frame별 오차나 이미지 차이는 아직 계산하지 않습니다.
+- dataset shape이 서로 달라도 통계 요약만 비교합니다.
+- 큰 dataset에서도 전체 배열을 읽어 통계를 계산합니다.
+
+
+7. 다음 개발 방향
+-----------------
+
+다음 후보:
+
+1. dataset 간 final frame 차이 metric
+2. 같은 grid size일 때 frame-by-frame L2/Linf 차이 계산
+3. 비교 결과를 Plotly chart로 시각화
+4. 여러 run manifest 파일 생성
+5. benchmark 결과와 dataset metadata 결합
+
+
+8. 한 줄 요약
+--------------
+
+compare_wave_datasets.py는 여러 wave dataset의 provenance와 기본 물리 수치를 표로 비교해,
+GPU 파도 실험을 재현하고 비교하는 기반을 제공합니다.

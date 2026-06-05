@@ -97,6 +97,10 @@ streamline viewer 생성:
 
     .\.venv\Scripts\python.exe shallow_water_streamline_viewer.py --input-npz outputs\wave_dataset_velocity.npz
 
+dataset 비교 표 생성:
+
+    .\.venv\Scripts\python.exe compare_wave_datasets.py outputs\wave_dataset.npz outputs\wave_dataset_velocity.npz
+
 
 4. 왜 중요한가
 --------------
@@ -130,6 +134,7 @@ streamline viewer 생성:
 - velocity dataset에서 particle trace Plotly viewer 생성
 - velocity dataset에서 particle animation Plotly viewer 생성
 - velocity dataset에서 streamline Plotly viewer 생성
+- dataset comparison Markdown 생성
 - custom particle seed range validation 확인
 - Euler/RK2 particle integrator validation 확인
 - particle wet/dry clipping validation 확인
@@ -147,6 +152,7 @@ streamline viewer 생성:
 - velocity field u, v 저장은 옵션입니다.
 - speed-colored Plotly viewer는 u, v의 크기만 사용하며 방향 벡터는 아직 표시하지 않습니다.
 - 대용량 데이터셋 저장 전략은 아직 단순 NPZ입니다.
+- dataset 비교 도구는 기본 통계와 metadata 중심이며 frame별 차이는 아직 계산하지 않습니다.
 - 아주 큰 장기 시뮬레이션에는 chunked 저장 형식이 더 적합할 수 있습니다.
 
 
@@ -158,7 +164,7 @@ streamline viewer 생성:
 1. streamline 방향 화살표 추가
 2. wet/dry boundary의 reflection/sliding 처리
 3. frame 단위 chunk 저장
-4. 여러 run을 비교하는 viewer
+4. dataset 간 frame-by-frame 차이 metric
 5. 임의 shape 또는 mask 기반 seed 배치
 
 
