@@ -79,6 +79,10 @@ metadata에는 다음 정보가 들어갑니다.
 
     .\.venv\Scripts\python.exe shallow_water_vector_viewer.py --input-npz outputs\wave_dataset_velocity.npz
 
+입자 흐름 궤적 viewer 생성:
+
+    .\.venv\Scripts\python.exe shallow_water_particle_viewer.py --input-npz outputs\wave_dataset_velocity.npz
+
 
 4. 왜 중요한가
 --------------
@@ -108,6 +112,7 @@ metadata에는 다음 정보가 들어갑니다.
 - validate_wave_workflow.py에서 velocity dataset 저장/로드 확인
 - velocity dataset에서 speed-colored Plotly viewer 생성
 - velocity dataset에서 cone vector Plotly viewer 생성
+- velocity dataset에서 particle trace Plotly viewer 생성
 
 현재 기본 데이터셋:
 
@@ -131,10 +136,11 @@ metadata에는 다음 정보가 들어갑니다.
 다음 확장 후보:
 
 1. streamline 시각화
-2. frame 단위 chunk 저장
-3. 데이터셋 metadata에 Git commit hash 기록
-4. 여러 run을 비교하는 viewer
-5. Three.js viewer가 NPZ 또는 JSON 변환 데이터를 읽게 만들기
+2. particle trace를 시간 애니메이션으로 표시
+3. frame 단위 chunk 저장
+4. 데이터셋 metadata에 Git commit hash 기록
+5. 여러 run을 비교하는 viewer
+6. Three.js viewer가 NPZ 또는 JSON 변환 데이터를 읽게 만들기
 
 
 8. 한 줄 요약

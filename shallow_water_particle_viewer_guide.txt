@@ -1,0 +1,109 @@
+﻿shallow_water_particle_viewer.py 가이드
+=====================================
+
+이 파일은 velocity dataset에 저장된 `u_frames`, `v_frames`를 사용해서 seed particle들을
+흐름 방향으로 이동시키고, 그 이동 궤적을 3D 선으로 렌더링하는 Plotly HTML viewer입니다.
+
+cone vector viewer가 한 프레임의 순간적인 속도 방향을 보여준다면, particle viewer는 여러
+프레임에 걸친 흐름의 경로를 보여줍니다.
+
+
+1. 무엇을 만든 것인가
+---------------------
+
+shallow_water_particle_viewer.py는 다음 일을 합니다.
+
+1. velocity가 저장된 NPZ dataset을 읽습니다.
+2. 왼쪽 유입 영역 근처에 seed particle을 배치합니다.
+3. 각 프레임의 u, v velocity field를 bilinear sampling합니다.
+4. particle 위치를 속도 방향으로 조금씩 이동시킵니다.
+5. particle 경로를 3D Scatter3d line으로 그립니다.
+6. 최종 수면은 speed-colored surface로 표시합니다.
+7. 바닥 지형은 z = -H(x, y)로 함께 표시합니다.
+
+
+2. 실행 방법
+------------
+
+먼저 velocity dataset을 만듭니다.
+
+    .\.venv\Scripts\python.exe export_wave_dataset.py --store-velocity --output outputs\wave_dataset_velocity.npz
+
+그 다음 particle viewer를 생성합니다.
+
+    .\.venv\Scripts\python.exe shallow_water_particle_viewer.py --input-npz outputs\wave_dataset_velocity.npz
+
+
+3. 주요 옵션
+------------
+
+- --input-npz: velocity dataset 경로
+- --max-surface-points: 수면/바닥 렌더링 해상도
+- --seed-count-x: x방향 seed 개수
+- --seed-count-y: y방향 seed 개수
+- --particle-step-scale: particle advection 스케일
+- --output-dir: HTML 저장 폴더
+
+
+4. 출력 파일
+------------
+
+기본 출력:
+
+    outputs\shallow_water_particle_viewer.html
+
+브라우저에서 열면 speed-colored 수면 위에 particle path들이 궤적 선으로 표시됩니다.
+
+
+5. 시각화 의미
+--------------
+
+particle path는 저장된 velocity frame을 따라 이동한 seed들의 추적 경로입니다.
+
+이 viewer는 다음을 보는 데 유용합니다.
+
+- 유입 파동이 어느 방향으로 흐르는지
+- 얕은 지형 주변에서 경로가 어떻게 휘는지
+- 강한 흐름 영역과 particle path가 어떻게 겹치는지
+
+
+6. 현재 검증
+------------
+
+다음 검증을 완료했습니다.
+
+- 96 x 96 velocity smoke dataset에서 HTML 생성
+- 192 x 192 기본 velocity dataset에서 HTML 생성
+- HTML marker 확인: title, Plotly.newPlot, particle paths, scatter3d, surfacecolor
+- seed 6 x 8 기준 particle 48개, frame 20개 추적 확인
+- validate_wave_workflow.py 통과
+- pip check 통과
+
+
+7. 현재 한계
+------------
+
+- particle path는 진단용 시각화이며 정교한 Lagrangian integrator는 아닙니다.
+- velocity frame 사이 시간 보간은 아직 없습니다.
+- particle은 wet/dry boundary를 정교하게 처리하지 않습니다.
+- 현재는 전체 추적 경로를 한 번에 보여주며, particle 자체를 시간 애니메이션하지 않습니다.
+- seed 위치는 왼쪽 유입 영역에 고정된 기본 패턴입니다.
+
+
+8. 다음 개발 방향
+-----------------
+
+다음 후보:
+
+1. particle 위치 자체를 프레임별 애니메이션으로 표시
+2. wet/dry mask 기반 particle clipping
+3. seed 위치를 CLI 옵션으로 더 세밀하게 설정
+4. streamline 전용 viewer
+5. Three.js 기반 particle animation
+
+
+9. 한 줄 요약
+--------------
+
+shallow_water_particle_viewer.py는 저장된 velocity field를 따라 seed particle을 이동시켜,
+3D 파도 표면 위의 흐름 경로를 한눈에 볼 수 있게 합니다.
