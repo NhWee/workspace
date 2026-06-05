@@ -1,0 +1,79 @@
+spectral_choppy_wave_viewer.py 가이드
+====================================
+
+이 파일은 GPU FFT spectral wave에 수평 변위를 더해 choppy 3D surface를 만드는 Plotly viewer입니다.
+
+기존 `spectral_wave_surface_3d.py`는 고정된 x/y grid 위의 높이 `eta(x, y, t)`를 보여줍니다.
+이 viewer는 같은 spectral phase에서 horizontal displacement를 계산해 surface의 x/y 좌표도 함께
+움직입니다.
+
+
+1. 사용한 근사
+--------------
+
+수면 높이 spectrum을 `eta_hat(k, t)`라고 할 때, choppy displacement는 다음 형태를 사용합니다.
+
+    D_x_hat(k, t) = -i * kx / |k| * eta_hat(k, t)
+    D_y_hat(k, t) = -i * ky / |k| * eta_hat(k, t)
+
+그리고 렌더링 좌표는 다음처럼 만듭니다.
+
+    X = x + choppiness * D_x
+    Y = y + choppiness * D_y
+    Z = eta
+
+이 근사는 실제 해양 모델의 완전한 choppy wave 구현은 아니지만, FFT wave surface에서 crest가 더
+날카롭게 보이도록 만드는 중요한 렌더링 단계입니다.
+
+
+2. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe spectral_choppy_wave_viewer.py
+
+작은 테스트:
+
+    .\.venv\Scripts\python.exe spectral_choppy_wave_viewer.py --size 96 --steps 90 --frame-every 15 --output outputs\spectral_choppy_test.html
+
+더 강한 choppiness:
+
+    .\.venv\Scripts\python.exe spectral_choppy_wave_viewer.py --choppiness 1.1 --wave-amplitude 0.07
+
+
+3. 출력 파일
+------------
+
+기본 출력:
+
+    outputs\spectral_choppy_wave_viewer.html
+
+이 파일은 Plotly HTML입니다. 브라우저에서 회전/확대/프레임 슬라이더/Play 버튼을 사용할 수 있습니다.
+
+
+4. 왜 중요한가
+--------------
+
+3D 파도 표면은 단순 height-field보다 수평 변위가 들어갈 때 훨씬 실제 파도처럼 보입니다.
+
+이 viewer는 다음 단계로 가는 발판입니다.
+
+- spectral wave crest를 더 날카롭게 표현
+- 향후 normal map, foam mask, whitecap detection과 연결
+- 렌더링용 mesh 좌표를 height-only dataset과 분리해 실험
+
+
+5. 현재 한계
+------------
+
+- choppy displacement는 HTML viewer에서만 계산/사용하고 dataset에 저장하지 않습니다.
+- 과도한 `--choppiness` 값은 surface self-overlap을 만들 수 있습니다.
+- bathymetry나 shoreline은 반영하지 않습니다.
+
+
+6. 한 줄 요약
+--------------
+
+`spectral_choppy_wave_viewer.py`는 GPU FFT spectral wave에 수평 변위를 더해, 더 입체적인 3D 파도
+표면을 보여주는 Plotly viewer입니다.

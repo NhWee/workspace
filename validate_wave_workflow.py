@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 
+import numpy as np
 import torch
 
 from benchmark_spectral_wave import benchmark_size as benchmark_spectral_size, save_benchmark_chart
@@ -19,6 +20,7 @@ from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, 
 from shallow_water_plotly_viewer import build_interactive_figure
 from shallow_water_streamline_viewer import build_streamline_figure, trace_streamlines
 from shallow_water_velocity_viewer import build_velocity_figure
+from spectral_choppy_wave_viewer import build_choppy_figure, simulate_choppy_frames
 from spectral_wave_surface_3d import simulate_spectral_wave
 from sweep_wave_experiments import parse_float_list, run_sweep
 from wave_dataset import load_wave_dataset, load_wave_dataset_with_velocity, save_wave_dataset
@@ -347,6 +349,36 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("GPU FFT spectral wave surface colored by speed" in spectral_velocity_html_text, "Spectral velocity HTML title missing.")
     assert_condition("Plotly.newPlot" in spectral_velocity_html_text, "Spectral velocity HTML is missing Plotly.newPlot.")
     print(f"Validated spectral wave dataset and viewer: {spectral_html_path}")
+
+    choppy_frames = simulate_choppy_frames(
+        size=max(32, size // 2),
+        steps=max(24, steps // 3),
+        frame_every=max(6, frame_every // 2),
+        domain_size=8.0,
+        gravity=9.81,
+        dt=0.04,
+        wave_amplitude=0.06,
+        peak_wavelength=1.2,
+        bandwidth=0.32,
+        wind_direction_degrees=25.0,
+        directional_spread=6.0,
+        damping=0.9995,
+        seed=19,
+        choppiness=0.7,
+        max_surface_points=min(48, size),
+        device=device,
+    )
+    assert_condition(len(choppy_frames) > 0, "Choppy spectral viewer produced no frames.")
+    choppy_x, choppy_y, choppy_z = choppy_frames[-1]
+    assert_condition(choppy_x.shape == choppy_y.shape == choppy_z.shape, "Choppy frame shape mismatch.")
+    assert_condition(bool(np.isfinite(choppy_z).all()), "Choppy frame contains non-finite eta values.")
+    choppy_fig = build_choppy_figure(choppy_frames, domain_size=8.0)
+    choppy_html_path = output_dir / "workflow_validation_spectral_choppy_viewer.html"
+    choppy_fig.write_html(choppy_html_path, include_plotlyjs=True, full_html=True)
+    choppy_html_text = choppy_html_path.read_text(encoding="utf-8")
+    assert_condition("Interactive GPU FFT choppy wave surface" in choppy_html_text, "Choppy HTML title missing.")
+    assert_condition("Plotly.newPlot" in choppy_html_text, "Choppy HTML is missing Plotly.newPlot.")
+    print(f"Validated spectral choppy wave viewer: {choppy_html_path}")
 
     spectral_benchmark = benchmark_spectral_size(
         size=max(32, size // 2),

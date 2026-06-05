@@ -75,6 +75,10 @@ velocity를 저장할 때는 다음 근사를 사용합니다.
 
     .\.venv\Scripts\python.exe shallow_water_velocity_viewer.py --input-npz outputs\spectral_wave_velocity.npz
 
+수평 변위가 들어간 choppy surface viewer 생성:
+
+    .\.venv\Scripts\python.exe spectral_choppy_wave_viewer.py --output outputs\spectral_choppy_wave_viewer.html
+
 
 4. 출력 파일
 ------------
@@ -98,7 +102,7 @@ NPZ에는 기존 dataset workflow와 같은 `frames`, `depth`, `metadata`가 들
 - FFT 기반이라 큰 grid에서도 GPU로 빠르게 계산 가능
 - 방향성 있는 파도 표면을 자연스럽게 생성
 - 기존 dataset, viewer, comparison workflow와 호환
-- 향후 Phillips/JONSWAP spectrum, choppy wave, normal map, foam mask로 확장 가능
+- 향후 Phillips/JONSWAP spectrum, normal map, foam mask로 확장 가능
 
 
 6. 현재 한계
@@ -117,7 +121,7 @@ NPZ에는 기존 dataset workflow와 같은 `frames`, `depth`, `metadata`가 들
 다음 후보:
 
 1. Phillips 또는 JONSWAP spectrum
-2. horizontal displacement를 더한 choppy wave surface
+2. choppy wave displacement를 dataset이나 mesh export로 저장
 3. spectral velocity/normal field 저장
 4. foam/whitecap mask 생성
 5. spectral solver benchmark와 sweep workflow 연결
