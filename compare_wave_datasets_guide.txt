@@ -62,6 +62,10 @@ frame별 L2/Linf CSV 저장:
 
     .\.venv\Scripts\python.exe compare_wave_datasets.py outputs\run_a.npz outputs\run_b.npz --frame-metrics-dir outputs\frame_metrics
 
+frame별 L2/Linf Plotly chart 저장:
+
+    .\.venv\Scripts\python.exe compare_wave_datasets.py outputs\run_a.npz outputs\run_b.npz --frame-metrics-chart outputs\frame_metrics.html
+
 
 3. 출력 파일
 ------------
@@ -77,6 +81,8 @@ frame별 L2/Linf CSV 저장:
 
 `--frame-metrics-dir`를 지정하면 baseline과 전체 frame tensor shape이 같은 dataset에 대해
 frame별 L2/Linf CSV를 저장합니다.
+
+`--frame-metrics-chart`를 지정하면 같은 frame별 L2/Linf series를 Plotly HTML chart로 저장합니다.
 
 
 4. 왜 중요한가
@@ -103,6 +109,7 @@ frame별 L2/Linf CSV를 저장합니다.
 - 같은 grid shape dataset의 final frame L2/Linf 차이 계산
 - 같은 frame tensor shape dataset의 frame-wise L2/Linf summary 계산
 - 같은 frame tensor shape dataset의 frame-wise L2/Linf CSV 저장
+- 같은 frame tensor shape dataset의 frame-wise L2/Linf Plotly chart 저장
 - 같은 grid shape dataset의 final frame difference heatmap 저장
 - Markdown comparison table 생성
 - validate_wave_workflow.py에서 comparison markdown 생성 확인
@@ -113,7 +120,7 @@ frame별 L2/Linf CSV를 저장합니다.
 6. 현재 한계
 ------------
 
-- 비교 결과는 요약 metric과 frame별 CSV 중심이며, animation은 아직 만들지 않습니다.
+- 비교 결과는 요약 metric, frame별 CSV, Plotly chart 중심이며 animation은 아직 만들지 않습니다.
 - dataset shape이 서로 다르면 차이 metric은 계산하지 않습니다.
 - 큰 dataset에서도 전체 배열을 읽어 통계를 계산합니다.
 
@@ -123,11 +130,11 @@ frame별 L2/Linf CSV를 저장합니다.
 
 다음 후보:
 
-1. 비교 결과를 Plotly chart로 시각화
-2. 여러 run manifest 파일 생성
-3. benchmark 결과와 dataset metadata 결합
-4. frame-by-frame 차이 animation
-5. frame별 차이 peak 자동 탐지
+1. 여러 run manifest 파일 생성
+2. benchmark 결과와 dataset metadata 결합
+3. frame-by-frame 차이 animation
+4. frame별 차이 peak 자동 탐지
+5. chart에 benchmark overlay 추가
 
 
 8. 한 줄 요약

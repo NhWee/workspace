@@ -5,6 +5,7 @@ from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
+import plotly.graph_objects as go
 
 
 SUMMARY_FIELDS = [
@@ -150,6 +151,59 @@ def save_frame_metric_series(summaries: list[dict[str, Any]], output_dir: Path) 
     return saved_paths
 
 
+def make_frame_metric_chart(summaries: list[dict[str, Any]]) -> go.Figure:
+    add_baseline_difference_metrics(summaries)
+    fig = go.Figure()
+    if not summaries:
+        return fig
+
+    baseline_summary = summaries[0]
+    for index, summary in enumerate(summaries):
+        if index == 0:
+            continue
+
+        series = compute_frame_metric_series(summary, baseline_summary)
+        if series is None:
+            continue
+
+        frame_l2, frame_linf = series
+        frame_index = np.arange(len(frame_l2))
+        dataset_name = Path(summary["path"]).name
+        fig.add_trace(
+            go.Scatter(
+                x=frame_index,
+                y=frame_l2,
+                mode="lines+markers",
+                name=f"{dataset_name} L2",
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=frame_index,
+                y=frame_linf,
+                mode="lines+markers",
+                name=f"{dataset_name} Linf",
+            )
+        )
+
+    fig.update_layout(
+        title="Frame-wise wave dataset difference vs baseline",
+        xaxis={"title": "Frame index"},
+        yaxis={"title": "Difference"},
+        hovermode="x unified",
+        margin={"l": 64, "r": 24, "t": 56, "b": 48},
+    )
+    return fig
+
+
+def save_frame_metric_chart(summaries: list[dict[str, Any]], output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig = make_frame_metric_chart(summaries)
+    fig.write_html(output_path, include_plotlyjs=True, full_html=True)
+    print(f"Saved frame metric chart: {output_path}")
+    return output_path
+
+
 def save_final_frame_difference_heatmaps(summaries: list[dict[str, Any]], output_dir: Path) -> list[Path]:
     add_baseline_difference_metrics(summaries)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -232,6 +286,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional directory for per-frame L2/Linf metric CSV files.",
     )
+    parser.add_argument(
+        "--frame-metrics-chart",
+        type=Path,
+        default=None,
+        help="Optional Plotly HTML output for per-frame L2/Linf metrics.",
+    )
     return parser.parse_args()
 
 
@@ -246,6 +306,8 @@ def main() -> None:
         saved_paths = save_frame_metric_series(summaries, args.frame_metrics_dir)
         for path in saved_paths:
             print(f"Saved frame metric series: {path}")
+    if args.frame_metrics_chart:
+        save_frame_metric_chart(summaries, args.frame_metrics_chart)
     table_text = make_markdown_table(summaries)
     print(table_text)
     write_summary(args.output, table_text)

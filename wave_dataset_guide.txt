@@ -109,6 +109,10 @@ frame별 차이 CSV까지 생성:
 
     .\.venv\Scripts\python.exe compare_wave_datasets.py outputs\run_a.npz outputs\run_b.npz --frame-metrics-dir outputs\frame_metrics
 
+frame별 차이 Plotly chart까지 생성:
+
+    .\.venv\Scripts\python.exe compare_wave_datasets.py outputs\run_a.npz outputs\run_b.npz --frame-metrics-chart outputs\frame_metrics.html
+
 
 4. 왜 중요한가
 --------------
@@ -146,6 +150,7 @@ frame별 차이 CSV까지 생성:
 - dataset final frame L2/Linf 비교 metric 생성
 - dataset frame-wise L2/Linf summary metric 생성
 - dataset frame-wise L2/Linf CSV 생성
+- dataset frame-wise L2/Linf Plotly chart 생성
 - dataset final frame 차이 heatmap 생성
 - custom particle seed range validation 확인
 - Euler/RK2 particle integrator validation 확인
@@ -164,7 +169,7 @@ frame별 차이 CSV까지 생성:
 - velocity field u, v 저장은 옵션입니다.
 - speed-colored Plotly viewer는 u, v의 크기만 사용하며 방향 벡터는 아직 표시하지 않습니다.
 - 대용량 데이터셋 저장 전략은 아직 단순 NPZ입니다.
-- dataset 비교 도구는 frame-wise summary metric과 CSV를 만들지만 animation은 아직 만들지 않습니다.
+- dataset 비교 도구는 frame-wise summary metric, CSV, Plotly chart를 만들지만 animation은 아직 만들지 않습니다.
 - 아주 큰 장기 시뮬레이션에는 chunked 저장 형식이 더 적합할 수 있습니다.
 
 
@@ -177,7 +182,7 @@ frame별 차이 CSV까지 생성:
 2. wet/dry boundary의 reflection/sliding 처리
 3. frame 단위 chunk 저장
 4. frame-by-frame 차이 animation
-5. dataset 비교 Plotly chart
+5. dataset 비교 benchmark overlay
 
 
 8. 한 줄 요약

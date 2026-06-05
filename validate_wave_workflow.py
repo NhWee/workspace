@@ -7,6 +7,7 @@ from compare_wave_datasets import (
     load_dataset_summary,
     make_markdown_table,
     save_final_frame_difference_heatmaps,
+    save_frame_metric_chart,
     save_frame_metric_series,
     write_summary,
 )
@@ -98,6 +99,11 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(frame_metric_paths[0].exists(), "Validation frame metrics CSV was not created.")
     frame_metric_text = frame_metric_paths[0].read_text(encoding="utf-8")
     assert_condition("frame_index,l2_vs_baseline,linf_vs_baseline" in frame_metric_text, "Frame metrics CSV header mismatch.")
+    frame_metric_chart_path = output_dir / "workflow_validation_frame_metrics.html"
+    save_frame_metric_chart([dataset_summary, duplicate_summary], frame_metric_chart_path)
+    frame_metric_chart_text = frame_metric_chart_path.read_text(encoding="utf-8")
+    assert_condition("Frame-wise wave dataset difference vs baseline" in frame_metric_chart_text, "Frame metrics chart title missing.")
+    assert_condition("Plotly.newPlot" in frame_metric_chart_text, "Frame metrics chart is missing Plotly.newPlot.")
     assert_condition(duplicate_summary["final_l2_vs_baseline"] == 0.0, "Duplicate final L2 metric must be zero.")
     comparison_table = make_markdown_table([dataset_summary, duplicate_summary])
     assert_condition("frame_count" in comparison_table, "Dataset comparison table is missing frame_count.")
