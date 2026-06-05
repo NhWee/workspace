@@ -118,6 +118,7 @@ metadata에는 다음 정보가 들어갑니다.
 - velocity dataset에서 cone vector Plotly viewer 생성
 - velocity dataset에서 particle trace Plotly viewer 생성
 - velocity dataset에서 particle animation Plotly viewer 생성
+- particle wet/dry clipping validation 확인
 
 현재 기본 데이터셋:
 
@@ -141,7 +142,7 @@ metadata에는 다음 정보가 들어갑니다.
 다음 확장 후보:
 
 1. streamline 시각화
-2. wet/dry boundary 기반 particle 처리
+2. wet/dry boundary의 reflection/sliding 처리
 3. frame 단위 chunk 저장
 4. 데이터셋 metadata에 Git commit hash 기록
 5. 여러 run을 비교하는 viewer

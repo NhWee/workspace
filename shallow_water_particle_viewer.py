@@ -39,9 +39,25 @@ def make_particle_seeds(count_x: int, count_y: int) -> tuple[np.ndarray, np.ndar
     return xx.reshape(-1), yy.reshape(-1)
 
 
-def trace_particles(frames, u_frames, v_frames, seed_x: np.ndarray, seed_y: np.ndarray, step_scale: float):
+def make_wet_mask(depth, wet_depth_threshold: float) -> np.ndarray:
+    return (depth.detach().cpu().numpy() > wet_depth_threshold).astype(np.float32)
+
+
+def trace_particles(
+    frames,
+    u_frames,
+    v_frames,
+    seed_x: np.ndarray,
+    seed_y: np.ndarray,
+    step_scale: float,
+    depth=None,
+    wet_depth_threshold: float = 0.055,
+    block_dry_cells: bool = True,
+):
     x = seed_x.copy()
     y = seed_y.copy()
+    wet_mask = make_wet_mask(depth, wet_depth_threshold) if block_dry_cells and depth is not None else None
+
     paths_x = [x.copy()]
     paths_y = [y.copy()]
     paths_z = [bilinear_sample(frames[0].detach().cpu().numpy(), x, y)]
@@ -49,8 +65,15 @@ def trace_particles(frames, u_frames, v_frames, seed_x: np.ndarray, seed_y: np.n
     for eta_frame, u_frame, v_frame in zip(frames[1:], u_frames[1:], v_frames[1:]):
         u = u_frame.detach().cpu().numpy()
         v = v_frame.detach().cpu().numpy()
-        x = np.clip(x + step_scale * bilinear_sample(u, x, y), -1.0, 1.0)
-        y = np.clip(y + step_scale * bilinear_sample(v, x, y), -1.0, 1.0)
+        proposed_x = np.clip(x + step_scale * bilinear_sample(u, x, y), -1.0, 1.0)
+        proposed_y = np.clip(y + step_scale * bilinear_sample(v, x, y), -1.0, 1.0)
+        if wet_mask is not None:
+            proposed_is_wet = bilinear_sample(wet_mask, proposed_x, proposed_y) >= 0.5
+            x = np.where(proposed_is_wet, proposed_x, x)
+            y = np.where(proposed_is_wet, proposed_y, y)
+        else:
+            x = proposed_x
+            y = proposed_y
         z = bilinear_sample(eta_frame.detach().cpu().numpy(), x, y)
         paths_x.append(x.copy())
         paths_y.append(y.copy())
@@ -91,6 +114,8 @@ def build_particle_figure(
     seed_count_x: int,
     seed_count_y: int,
     particle_step_scale: float,
+    wet_depth_threshold: float,
+    block_dry_cells: bool,
 ) -> go.Figure:
     water_surfaces = [downsample_frame(frame, max_surface_points) for frame in frames]
     speed_surfaces = [
@@ -106,7 +131,17 @@ def build_particle_figure(
     z_max = max(eta_limit * 1.4, 0.08)
 
     seed_x, seed_y = make_particle_seeds(seed_count_x, seed_count_y)
-    paths_x, paths_y, paths_z = trace_particles(frames, u_frames, v_frames, seed_x, seed_y, particle_step_scale)
+    paths_x, paths_y, paths_z = trace_particles(
+        frames,
+        u_frames,
+        v_frames,
+        seed_x,
+        seed_y,
+        particle_step_scale,
+        depth=depth,
+        wet_depth_threshold=wet_depth_threshold,
+        block_dry_cells=block_dry_cells,
+    )
 
     fig = go.Figure(
         data=[
@@ -148,6 +183,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed-count-x", type=int, default=6, help="Number of particle seeds along x.")
     parser.add_argument("--seed-count-y", type=int, default=8, help="Number of particle seeds along y.")
     parser.add_argument("--particle-step-scale", type=float, default=0.55, help="Scale factor for particle advection.")
+    parser.add_argument("--wet-depth-threshold", type=float, default=0.055, help="Minimum depth treated as wet.")
+    parser.add_argument("--allow-dry-particles", action="store_true", help="Allow particles to move into dry cells.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Output directory.")
     return parser.parse_args()
 
@@ -172,6 +209,8 @@ def main() -> None:
         args.seed_count_x,
         args.seed_count_y,
         args.particle_step_scale,
+        args.wet_depth_threshold,
+        not args.allow_dry_particles,
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)

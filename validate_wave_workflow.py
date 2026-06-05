@@ -5,6 +5,7 @@ import torch
 
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
+from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
 from shallow_water_plotly_viewer import build_interactive_figure
 from wave_dataset import load_wave_dataset, load_wave_dataset_with_velocity, save_wave_dataset
 
@@ -71,6 +72,23 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(loaded_v_frames is not None and len(loaded_v_frames) == len(frames), "Loaded v velocity mismatch.")
     print(f"Reloaded dataset: {dataset_path}")
 
+    seed_x, seed_y = make_particle_seeds(3, 4)
+    paths_x, paths_y, _ = trace_particles(
+        loaded_frames,
+        loaded_u_frames,
+        loaded_v_frames,
+        seed_x,
+        seed_y,
+        step_scale=0.55,
+        depth=loaded_depth,
+        wet_depth_threshold=0.055,
+        block_dry_cells=True,
+    )
+    wet_mask = make_wet_mask(loaded_depth, wet_depth_threshold=0.055)
+    sampled_wet = bilinear_sample(wet_mask, paths_x.reshape(-1), paths_y.reshape(-1))
+    assert_condition(float(sampled_wet.min()) >= 0.5, "Particle path entered a dry cell.")
+    print("Validated wet/dry particle clipping.")
+
     fig = build_interactive_figure(loaded_frames, loaded_depth, max_surface_points=min(48, size))
     html_path = output_dir / "workflow_validation_viewer.html"
     fig.write_html(html_path, include_plotlyjs=True, full_html=True)
@@ -89,6 +107,8 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
         seed_count_x=3,
         seed_count_y=4,
         particle_step_scale=0.55,
+        wet_depth_threshold=0.055,
+        block_dry_cells=True,
         trail_length=4,
         frame_duration_ms=90,
     )

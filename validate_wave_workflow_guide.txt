@@ -22,11 +22,12 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 7. NPZ dataset 다시 읽기
 8. metadata와 shape 확인
 9. u_frames, v_frames velocity data 확인
-10. Plotly interactive figure 생성
-11. HTML 저장
-12. HTML 안에 Plotly.newPlot과 title marker가 있는지 확인
-13. particle animation figure 생성
-14. particle animation HTML marker 확인
+10. wet/dry particle clipping 확인
+11. Plotly interactive figure 생성
+12. HTML 저장
+13. HTML 안에 Plotly.newPlot과 title marker가 있는지 확인
+14. particle animation figure 생성
+15. particle animation HTML marker 확인
 
 
 2. 실행 방법
@@ -64,6 +65,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - simulated frames: 6
 - NPZ 저장/불러오기 성공
 - u/v velocity frames 저장/불러오기 성공
+- wet/dry particle clipping 확인 성공
 - Plotly HTML 생성 성공
 - HTML marker 확인 성공
 - particle animation HTML 생성 성공

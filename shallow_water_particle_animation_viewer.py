@@ -92,6 +92,8 @@ def build_particle_animation_figure(
     seed_count_x: int,
     seed_count_y: int,
     particle_step_scale: float,
+    wet_depth_threshold: float,
+    block_dry_cells: bool,
     trail_length: int,
     frame_duration_ms: int,
 ) -> go.Figure:
@@ -104,7 +106,17 @@ def build_particle_animation_figure(
     x_grid, y_grid = prepare_surface_grid(water_surfaces[0].shape[0])
 
     seed_x, seed_y = make_particle_seeds(seed_count_x, seed_count_y)
-    paths_x, paths_y, paths_z = trace_particles(frames, u_frames, v_frames, seed_x, seed_y, particle_step_scale)
+    paths_x, paths_y, paths_z = trace_particles(
+        frames,
+        u_frames,
+        v_frames,
+        seed_x,
+        seed_y,
+        particle_step_scale,
+        depth=depth,
+        wet_depth_threshold=wet_depth_threshold,
+        block_dry_cells=block_dry_cells,
+    )
 
     eta_limit = max(float(np.max(np.abs(surface))) for surface in water_surfaces)
     speed_max = max(max(float(np.max(speed)), 1.0e-6) for speed in speed_surfaces)
@@ -199,6 +211,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed-count-x", type=int, default=6, help="Number of particle seeds along x.")
     parser.add_argument("--seed-count-y", type=int, default=8, help="Number of particle seeds along y.")
     parser.add_argument("--particle-step-scale", type=float, default=0.55, help="Scale factor for particle advection.")
+    parser.add_argument("--wet-depth-threshold", type=float, default=0.055, help="Minimum depth treated as wet.")
+    parser.add_argument("--allow-dry-particles", action="store_true", help="Allow particles to move into dry cells.")
     parser.add_argument("--trail-length", type=int, default=8, help="Number of prior frames kept in each particle trail.")
     parser.add_argument("--frame-duration-ms", type=int, default=110, help="Animation frame duration in milliseconds.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Output directory.")
@@ -225,6 +239,8 @@ def main() -> None:
         args.seed_count_x,
         args.seed_count_y,
         args.particle_step_scale,
+        args.wet_depth_threshold,
+        not args.allow_dry_particles,
         args.trail_length,
         args.frame_duration_ms,
     )

@@ -17,9 +17,10 @@ shallow_water_particle_viewer.py는 다음 일을 합니다.
 2. 왼쪽 유입 영역 근처에 seed particle을 배치합니다.
 3. 각 프레임의 u, v velocity field를 bilinear sampling합니다.
 4. particle 위치를 속도 방향으로 조금씩 이동시킵니다.
-5. particle 경로를 3D Scatter3d line으로 그립니다.
-6. 최종 수면은 speed-colored surface로 표시합니다.
-7. 바닥 지형은 z = -H(x, y)로 함께 표시합니다.
+5. 이동 후보 위치가 dry cell이면 이전 wet 위치를 유지합니다.
+6. particle 경로를 3D Scatter3d line으로 그립니다.
+7. 최종 수면은 speed-colored surface로 표시합니다.
+8. 바닥 지형은 z = -H(x, y)로 함께 표시합니다.
 
 
 2. 실행 방법
@@ -42,6 +43,8 @@ shallow_water_particle_viewer.py는 다음 일을 합니다.
 - --seed-count-x: x방향 seed 개수
 - --seed-count-y: y방향 seed 개수
 - --particle-step-scale: particle advection 스케일
+- --wet-depth-threshold: wet cell로 취급할 최소 수심
+- --allow-dry-particles: dry cell 진입 차단을 끄는 옵션
 - --output-dir: HTML 저장 폴더
 
 
@@ -65,6 +68,7 @@ particle path는 저장된 velocity frame을 따라 이동한 seed들의 추적 
 - 유입 파동이 어느 방향으로 흐르는지
 - 얕은 지형 주변에서 경로가 어떻게 휘는지
 - 강한 흐름 영역과 particle path가 어떻게 겹치는지
+- particle이 dry bathymetry 영역에 무리하게 들어가지 않는지
 
 
 6. 현재 검증
@@ -76,6 +80,7 @@ particle path는 저장된 velocity frame을 따라 이동한 seed들의 추적 
 - 192 x 192 기본 velocity dataset에서 HTML 생성
 - HTML marker 확인: title, Plotly.newPlot, particle paths, scatter3d, surfacecolor
 - seed 6 x 8 기준 particle 48개, frame 20개 추적 확인
+- wet/dry clipping validation 확인
 - validate_wave_workflow.py 통과
 - pip check 통과
 
@@ -85,7 +90,7 @@ particle path는 저장된 velocity frame을 따라 이동한 seed들의 추적 
 
 - particle path는 진단용 시각화이며 정교한 Lagrangian integrator는 아닙니다.
 - velocity frame 사이 시간 보간은 아직 없습니다.
-- particle은 wet/dry boundary를 정교하게 처리하지 않습니다.
+- particle은 dry cell 진입을 차단하지만, 경계 반사나 해안선 sliding 같은 정교한 처리는 아직 없습니다.
 - 현재는 전체 추적 경로를 한 번에 보여주며, particle 자체를 시간 애니메이션하지 않습니다.
 - seed 위치는 왼쪽 유입 영역에 고정된 기본 패턴입니다.
 
@@ -96,7 +101,7 @@ particle path는 저장된 velocity frame을 따라 이동한 seed들의 추적 
 다음 후보:
 
 1. particle 위치 자체를 프레임별 애니메이션으로 표시
-2. wet/dry mask 기반 particle clipping
+2. wet/dry boundary의 reflection/sliding 처리
 3. seed 위치를 CLI 옵션으로 더 세밀하게 설정
 4. streamline 전용 viewer
 5. Three.js 기반 particle animation
