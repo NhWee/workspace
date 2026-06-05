@@ -21,7 +21,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 6. NPZ dataset 저장
 7. NPZ dataset 다시 읽기
 8. metadata, provenance, shape 확인
-9. dataset comparison summary 생성
+9. dataset comparison summary와 final frame metric 생성
 10. u_frames, v_frames velocity data 확인
 11. custom particle seed range 확인
 12. Euler/RK2 particle integrator와 wet/dry clipping 확인
@@ -71,7 +71,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - simulated frames: 6
 - NPZ 저장/불러오기 성공
 - metadata provenance 필드 확인 성공
-- dataset comparison summary 생성 성공
+- dataset comparison summary와 final frame metric 생성 성공
 - u/v velocity frames 저장/불러오기 성공
 - custom particle seed range 확인 성공
 - Euler/RK2 particle integrator와 wet/dry clipping 확인 성공

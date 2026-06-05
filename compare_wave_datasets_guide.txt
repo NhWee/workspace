@@ -25,6 +25,11 @@ compare_wave_datasets.py는 다음 정보를 읽습니다.
 - eta_min / eta_max
 - depth_min / depth_max
 - speed_max
+- final_l2_vs_baseline
+- final_linf_vs_baseline
+
+`final_l2_vs_baseline`과 `final_linf_vs_baseline`은 첫 번째 dataset의 마지막 수면 frame을
+baseline으로 삼아 계산합니다. grid shape이 다르면 `-`로 표시합니다.
 
 
 2. 실행 방법
@@ -74,6 +79,7 @@ compare_wave_datasets.py는 다음 정보를 읽습니다.
 - metadata provenance field 읽기
 - frame/depth 기본 수치 범위 계산
 - velocity dataset의 speed_max 계산
+- 같은 grid shape dataset의 final frame L2/Linf 차이 계산
 - Markdown comparison table 생성
 - validate_wave_workflow.py에서 comparison markdown 생성 확인
 - py_compile 통과
@@ -83,8 +89,8 @@ compare_wave_datasets.py는 다음 정보를 읽습니다.
 6. 현재 한계
 ------------
 
-- 비교 결과는 요약 표이며, frame별 오차나 이미지 차이는 아직 계산하지 않습니다.
-- dataset shape이 서로 달라도 통계 요약만 비교합니다.
+- 비교 결과는 요약 표이며, 전체 frame-by-frame 오차나 이미지 차이는 아직 계산하지 않습니다.
+- dataset shape이 서로 다르면 final frame 차이 metric은 계산하지 않습니다.
 - 큰 dataset에서도 전체 배열을 읽어 통계를 계산합니다.
 
 
@@ -93,8 +99,8 @@ compare_wave_datasets.py는 다음 정보를 읽습니다.
 
 다음 후보:
 
-1. dataset 간 final frame 차이 metric
-2. 같은 grid size일 때 frame-by-frame L2/Linf 차이 계산
+1. 같은 grid size일 때 frame-by-frame L2/Linf 차이 계산
+2. final frame 차이 heatmap 저장
 3. 비교 결과를 Plotly chart로 시각화
 4. 여러 run manifest 파일 생성
 5. benchmark 결과와 dataset metadata 결합

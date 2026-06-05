@@ -83,6 +83,9 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     comparison_path = output_dir / "workflow_validation_dataset_comparison.md"
     comparison_table = make_markdown_table([dataset_summary])
     assert_condition("frame_count" in comparison_table, "Dataset comparison table is missing frame_count.")
+    assert_condition("final_l2_vs_baseline" in comparison_table, "Dataset comparison table is missing final L2 metric.")
+    assert_condition(dataset_summary["final_l2_vs_baseline"] == 0.0, "Baseline final L2 metric must be zero.")
+    assert_condition(dataset_summary["final_linf_vs_baseline"] == 0.0, "Baseline final Linf metric must be zero.")
     write_summary(comparison_path, comparison_table)
     print(f"Validated dataset comparison summary: {comparison_path}")
 

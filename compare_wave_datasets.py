@@ -22,6 +22,8 @@ SUMMARY_FIELDS = [
     "depth_min",
     "depth_max",
     "speed_max",
+    "final_l2_vs_baseline",
+    "final_linf_vs_baseline",
 ]
 
 
@@ -59,7 +61,25 @@ def load_dataset_summary(path: Path) -> dict[str, Any]:
         "depth_min": float(depth.min()),
         "depth_max": float(depth.max()),
         "speed_max": speed_max,
+        "_final_frame": frames[-1],
     }
+
+
+def add_baseline_difference_metrics(summaries: list[dict[str, Any]]) -> None:
+    if not summaries:
+        return
+
+    baseline = summaries[0]["_final_frame"]
+    for summary in summaries:
+        final_frame = summary["_final_frame"]
+        if final_frame.shape != baseline.shape:
+            summary["final_l2_vs_baseline"] = None
+            summary["final_linf_vs_baseline"] = None
+            continue
+
+        difference = final_frame - baseline
+        summary["final_l2_vs_baseline"] = float(np.sqrt(np.mean(difference * difference)))
+        summary["final_linf_vs_baseline"] = float(np.max(np.abs(difference)))
 
 
 def format_value(value: Any) -> str:
@@ -71,6 +91,7 @@ def format_value(value: Any) -> str:
 
 
 def make_markdown_table(summaries: list[dict[str, Any]]) -> str:
+    add_baseline_difference_metrics(summaries)
     rows = [[format_value(summary.get(field)) for field in SUMMARY_FIELDS] for summary in summaries]
     widths = [
         max(len(field), *(len(row[index]) for row in rows))
