@@ -20,6 +20,7 @@ sweep_wave_experiments.py 가이드
 - baseline 대비 final-frame heatmap 생성
 - frame별 L2/Linf CSV 생성
 - frame별 L2/Linf Plotly chart 생성
+- elapsed time / throughput / peak VRAM Plotly chart 생성
 - sweep dashboard HTML 생성
 - 전체 비교 Markdown table 생성
 - 실험 전체 manifest JSON 저장
@@ -66,6 +67,7 @@ velocity field까지 저장:
 - manifest.json
 - dashboard.html
 - frame_metrics.html
+- performance.html
 - frame_metrics\*.csv
 - diff_heatmaps\*.png
 
@@ -74,7 +76,7 @@ velocity field까지 저장:
 
 `dashboard.html`은 실험 전체를 사람이 읽기 쉽게 모은 첫 화면입니다. 각 run의 dataset,
 elapsed time, throughput, peak VRAM, baseline 대비 metric, heatmap, frame metrics CSV,
-frame_metrics.html 링크를 한 번에 보여줍니다.
+frame_metrics.html, performance.html 링크를 한 번에 보여줍니다.
 
 
 4. 왜 중요한가
@@ -92,6 +94,7 @@ frame_metrics.html 링크를 한 번에 보여줍니다.
 - GPU 실행 시간과 처리량을 run별로 비교
 - baseline 대비 차이를 자동 생성
 - Plotly chart로 시간별 차이를 확인
+- Plotly performance chart로 처리량과 VRAM 변화를 확인
 - dashboard에서 sweep 결과 파일을 한 번에 이동
 - 대형 GPU run으로 가기 전에 작은 run으로 안정성 확인
 - 나중에 3D viewer, benchmark, chunked dataset 저장으로 확장 가능
@@ -106,6 +109,7 @@ frame_metrics.html 링크를 한 번에 보여줍니다.
 - comparison.md 생성
 - dashboard.html 생성
 - frame_metrics.html 생성
+- performance.html 생성
 - elapsed time, throughput, peak VRAM metric 확인
 - frame_metrics CSV 생성
 - final-frame difference heatmap 생성
@@ -127,7 +131,7 @@ frame_metrics.html 링크를 한 번에 보여줍니다.
 다음 후보:
 
 1. multi-parameter grid sweep
-2. benchmark time/throughput chart 추가
+2. performance chart를 dashboard 내부에 embed
 3. frame별 차이 peak 자동 탐지
 4. sweep dashboard HTML 생성
 5. 대형 run용 chunked dataset 저장

@@ -6,6 +6,7 @@ import time
 from typing import Any
 
 import torch
+import plotly.graph_objects as go
 
 from compare_wave_datasets import (
     load_dataset_summary,
@@ -191,6 +192,7 @@ def render_dashboard(manifest: dict[str, Any], summaries: list[dict[str, Any]], 
     ]
     table_header = "<tr>" + "".join(f"<th>{escape(label)}</th>" for label in header_cells) + "</tr>"
     frame_chart_link = make_link("Open frame metric chart", outputs["frame_metrics_chart"], base_dir)
+    performance_chart_link = make_link("Open performance chart", outputs["performance_chart"], base_dir)
     comparison_link = make_link("Open comparison markdown", outputs["comparison"], base_dir)
     manifest_link = make_link("Open manifest JSON", "manifest.json", base_dir)
 
@@ -294,6 +296,7 @@ def render_dashboard(manifest: dict[str, Any], summaries: list[dict[str, Any]], 
       <div><span class="label">Device</span>{escape(manifest["device"])}</div>
     </section>
     <nav class="links" aria-label="Generated outputs">
+      {performance_chart_link}
       {frame_chart_link}
       {comparison_link}
       {manifest_link}
@@ -314,6 +317,74 @@ def save_dashboard(manifest: dict[str, Any], summaries: list[dict[str, Any]], ou
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(render_dashboard(manifest, summaries, output_path), encoding="utf-8")
     print(f"Saved sweep dashboard: {output_path}")
+    return output_path
+
+
+def make_performance_chart(manifest: dict[str, Any]) -> go.Figure:
+    runs = manifest["runs"]
+    sweep_values = [run["sweep_value"] for run in runs]
+    run_labels = [f"{run['run_index']:02d}: {run['sweep_value']:g}" for run in runs]
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=sweep_values,
+            y=[run["million_cell_steps_per_sec"] for run in runs],
+            mode="lines+markers",
+            name="Throughput",
+            customdata=run_labels,
+            hovertemplate="run=%{customdata}<br>throughput=%{y:.4g}M cell-steps/s<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=sweep_values,
+            y=[run["elapsed_sec"] for run in runs],
+            mode="lines+markers",
+            name="Elapsed seconds",
+            yaxis="y2",
+            customdata=run_labels,
+            hovertemplate="run=%{customdata}<br>elapsed=%{y:.4g}s<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=sweep_values,
+            y=[run["peak_vram_gib"] for run in runs],
+            mode="lines+markers",
+            name="Peak VRAM GiB",
+            yaxis="y3",
+            customdata=run_labels,
+            hovertemplate="run=%{customdata}<br>peak VRAM=%{y:.4g}GiB<extra></extra>",
+        )
+    )
+    fig.update_layout(
+        title="Wave sweep performance",
+        xaxis={"title": manifest["sweep_parameter"]},
+        yaxis={"title": "M cell-steps/s"},
+        yaxis2={
+            "title": "Elapsed seconds",
+            "overlaying": "y",
+            "side": "right",
+        },
+        yaxis3={
+            "title": "Peak VRAM GiB",
+            "overlaying": "y",
+            "side": "right",
+            "anchor": "free",
+            "position": 0.94,
+        },
+        hovermode="x unified",
+        margin={"l": 72, "r": 120, "t": 56, "b": 48},
+    )
+    return fig
+
+
+def save_performance_chart(manifest: dict[str, Any], output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig = make_performance_chart(manifest)
+    fig.write_html(output_path, include_plotlyjs=True, full_html=True)
+    print(f"Saved sweep performance chart: {output_path}")
     return output_path
 
 
@@ -350,6 +421,7 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
     frame_metrics_dir = experiment_dir / "frame_metrics"
     comparison_path = experiment_dir / "comparison.md"
     frame_metrics_chart_path = experiment_dir / "frame_metrics.html"
+    performance_chart_path = experiment_dir / "performance.html"
     dashboard_path = experiment_dir / "dashboard.html"
 
     heatmap_paths = save_final_frame_difference_heatmaps(summaries, heatmap_dir)
@@ -368,11 +440,13 @@ def run_sweep(args: argparse.Namespace) -> dict[str, Any]:
             "comparison": str(comparison_path),
             "dashboard": str(dashboard_path),
             "frame_metrics_chart": str(frame_metrics_chart_path),
+            "performance_chart": str(performance_chart_path),
             "diff_heatmaps": [str(path) for path in heatmap_paths],
             "frame_metrics_csv": [str(path) for path in frame_metric_paths],
         },
         "runs": runs,
     }
+    save_performance_chart(manifest, performance_chart_path)
     save_dashboard(manifest, summaries, dashboard_path)
     write_manifest(experiment_dir / "manifest.json", manifest)
     return manifest
