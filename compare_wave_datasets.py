@@ -28,6 +28,7 @@ SUMMARY_FIELDS = [
     "final_diff_heatmap",
     "frames_l2_mean_vs_baseline",
     "frames_linf_max_vs_baseline",
+    "frame_metrics_csv",
 ]
 
 
@@ -106,6 +107,49 @@ def safe_stem(path_text: str) -> str:
     return Path(path_text).stem.replace(" ", "_")
 
 
+def compute_frame_metric_series(summary: dict[str, Any], baseline_summary: dict[str, Any]) -> tuple[np.ndarray, np.ndarray] | None:
+    frames = summary["_frames"]
+    baseline_frames = baseline_summary["_frames"]
+    if frames.shape != baseline_frames.shape:
+        return None
+
+    frame_difference = frames - baseline_frames
+    frame_l2 = np.sqrt(np.mean(frame_difference * frame_difference, axis=(1, 2)))
+    frame_linf = np.max(np.abs(frame_difference), axis=(1, 2))
+    return frame_l2, frame_linf
+
+
+def save_frame_metric_series(summaries: list[dict[str, Any]], output_dir: Path) -> list[Path]:
+    add_baseline_difference_metrics(summaries)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    if not summaries:
+        return []
+
+    baseline_summary = summaries[0]
+    saved_paths = []
+    for index, summary in enumerate(summaries):
+        summary["frame_metrics_csv"] = None
+        if index == 0:
+            continue
+
+        series = compute_frame_metric_series(summary, baseline_summary)
+        if series is None:
+            continue
+
+        frame_l2, frame_linf = series
+        output_path = output_dir / f"frame_metrics_{index:02d}_{safe_stem(summary['path'])}.csv"
+        lines = ["frame_index,l2_vs_baseline,linf_vs_baseline"]
+        lines.extend(
+            f"{frame_index},{frame_l2[frame_index]:.9g},{frame_linf[frame_index]:.9g}"
+            for frame_index in range(len(frame_l2))
+        )
+        output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        summary["frame_metrics_csv"] = str(output_path)
+        saved_paths.append(output_path)
+
+    return saved_paths
+
+
 def save_final_frame_difference_heatmaps(summaries: list[dict[str, Any]], output_dir: Path) -> list[Path]:
     add_baseline_difference_metrics(summaries)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -182,6 +226,12 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional directory for final-frame absolute difference heatmaps.",
     )
+    parser.add_argument(
+        "--frame-metrics-dir",
+        type=Path,
+        default=None,
+        help="Optional directory for per-frame L2/Linf metric CSV files.",
+    )
     return parser.parse_args()
 
 
@@ -192,6 +242,10 @@ def main() -> None:
         saved_paths = save_final_frame_difference_heatmaps(summaries, args.diff_heatmap_dir)
         for path in saved_paths:
             print(f"Saved final-frame difference heatmap: {path}")
+    if args.frame_metrics_dir:
+        saved_paths = save_frame_metric_series(summaries, args.frame_metrics_dir)
+        for path in saved_paths:
+            print(f"Saved frame metric series: {path}")
     table_text = make_markdown_table(summaries)
     print(table_text)
     write_summary(args.output, table_text)
