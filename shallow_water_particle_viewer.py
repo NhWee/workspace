@@ -43,6 +43,30 @@ def make_wet_mask(depth, wet_depth_threshold: float) -> np.ndarray:
     return (depth.detach().cpu().numpy() > wet_depth_threshold).astype(np.float32)
 
 
+def particle_step(
+    x: np.ndarray,
+    y: np.ndarray,
+    u: np.ndarray,
+    v: np.ndarray,
+    step_scale: float,
+    integrator: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    if integrator == "euler":
+        proposed_x = x + step_scale * bilinear_sample(u, x, y)
+        proposed_y = y + step_scale * bilinear_sample(v, x, y)
+    elif integrator == "rk2":
+        velocity_x = bilinear_sample(u, x, y)
+        velocity_y = bilinear_sample(v, x, y)
+        midpoint_x = np.clip(x + 0.5 * step_scale * velocity_x, -1.0, 1.0)
+        midpoint_y = np.clip(y + 0.5 * step_scale * velocity_y, -1.0, 1.0)
+        proposed_x = x + step_scale * bilinear_sample(u, midpoint_x, midpoint_y)
+        proposed_y = y + step_scale * bilinear_sample(v, midpoint_x, midpoint_y)
+    else:
+        raise ValueError(f"Unknown particle integrator: {integrator}")
+
+    return np.clip(proposed_x, -1.0, 1.0), np.clip(proposed_y, -1.0, 1.0)
+
+
 def trace_particles(
     frames,
     u_frames,
@@ -53,6 +77,7 @@ def trace_particles(
     depth=None,
     wet_depth_threshold: float = 0.055,
     block_dry_cells: bool = True,
+    integrator: str = "rk2",
 ):
     x = seed_x.copy()
     y = seed_y.copy()
@@ -65,8 +90,7 @@ def trace_particles(
     for eta_frame, u_frame, v_frame in zip(frames[1:], u_frames[1:], v_frames[1:]):
         u = u_frame.detach().cpu().numpy()
         v = v_frame.detach().cpu().numpy()
-        proposed_x = np.clip(x + step_scale * bilinear_sample(u, x, y), -1.0, 1.0)
-        proposed_y = np.clip(y + step_scale * bilinear_sample(v, x, y), -1.0, 1.0)
+        proposed_x, proposed_y = particle_step(x, y, u, v, step_scale, integrator)
         if wet_mask is not None:
             proposed_is_wet = bilinear_sample(wet_mask, proposed_x, proposed_y) >= 0.5
             x = np.where(proposed_is_wet, proposed_x, x)
@@ -116,6 +140,7 @@ def build_particle_figure(
     particle_step_scale: float,
     wet_depth_threshold: float,
     block_dry_cells: bool,
+    particle_integrator: str,
 ) -> go.Figure:
     water_surfaces = [downsample_frame(frame, max_surface_points) for frame in frames]
     speed_surfaces = [
@@ -141,6 +166,7 @@ def build_particle_figure(
         depth=depth,
         wet_depth_threshold=wet_depth_threshold,
         block_dry_cells=block_dry_cells,
+        integrator=particle_integrator,
     )
 
     fig = go.Figure(
@@ -185,6 +211,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--particle-step-scale", type=float, default=0.55, help="Scale factor for particle advection.")
     parser.add_argument("--wet-depth-threshold", type=float, default=0.055, help="Minimum depth treated as wet.")
     parser.add_argument("--allow-dry-particles", action="store_true", help="Allow particles to move into dry cells.")
+    parser.add_argument(
+        "--particle-integrator",
+        choices=("euler", "rk2"),
+        default="rk2",
+        help="Particle advection integrator.",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Output directory.")
     return parser.parse_args()
 
@@ -211,6 +243,7 @@ def main() -> None:
         args.particle_step_scale,
         args.wet_depth_threshold,
         not args.allow_dry_particles,
+        args.particle_integrator,
     )
 
     args.output_dir.mkdir(parents=True, exist_ok=True)

@@ -16,7 +16,7 @@ shallow_water_particle_animation_viewer.py는 다음 일을 합니다.
 1. velocity가 포함된 NPZ dataset을 읽습니다.
 2. 수면 frame과 velocity frame을 downsample합니다.
 3. seed particle을 왼쪽 유입 영역에 배치합니다.
-4. 각 frame의 u, v velocity field를 따라 particle 위치를 업데이트합니다.
+4. Euler 또는 RK2 midpoint 방식으로 particle 위치를 업데이트합니다.
 5. 이동 후보 위치가 dry cell이면 이전 wet 위치를 유지합니다.
 6. 각 animation frame마다 bathymetry, speed-colored water surface, particle trail, current particle marker를 갱신합니다.
 
@@ -44,6 +44,7 @@ shallow_water_particle_animation_viewer.py는 다음 일을 합니다.
 - --seed-count-x: x방향 seed 개수
 - --seed-count-y: y방향 seed 개수
 - --particle-step-scale: particle advection 스케일
+- --particle-integrator: particle advection 방식, euler 또는 rk2
 - --wet-depth-threshold: wet cell로 취급할 최소 수심
 - --allow-dry-particles: dry cell 진입 차단을 끄는 옵션
 - --trail-length: 각 particle이 남기는 짧은 꼬리 길이
@@ -82,6 +83,7 @@ shallow_water_particle_animation_viewer.py는 다음 일을 합니다.
 
 - velocity dataset에서 animated Plotly HTML 생성
 - HTML marker 확인: title, Plotly.newPlot, particle trails, particles, surfacecolor
+- Euler/RK2 particle integrator validation 확인
 - wet/dry clipping validation 확인
 - validate_wave_workflow.py에서 particle animation HTML 생성 확인
 - py_compile 통과
@@ -91,7 +93,7 @@ shallow_water_particle_animation_viewer.py는 다음 일을 합니다.
 7. 현재 한계
 ------------
 
-- particle 이동은 진단용 explicit advection입니다.
+- 기본 particle 이동은 RK2 midpoint 방식이지만, 여전히 진단용 advection입니다.
 - velocity frame 사이 시간 보간은 아직 없습니다.
 - particle은 dry cell 진입을 차단하지만, 경계 반사나 해안선 sliding 같은 정교한 처리는 아직 없습니다.
 - Plotly animation은 실험용 시각화에 적합하며, 더 많은 particle이나 긴 frame에서는 Three.js가 더 적합합니다.
@@ -104,7 +106,7 @@ shallow_water_particle_animation_viewer.py는 다음 일을 합니다.
 
 1. Three.js/WebGL 기반 실시간 particle animation
 2. wet/dry boundary의 reflection/sliding 처리
-3. 더 정교한 Runge-Kutta particle integrator
+3. RK4 또는 시간 보간 기반 particle integrator
 4. 여러 seed 패턴 지원
 5. 수면과 particle을 같은 시간축으로 더 촘촘하게 보간
 

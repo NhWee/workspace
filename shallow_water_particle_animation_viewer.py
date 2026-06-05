@@ -94,6 +94,7 @@ def build_particle_animation_figure(
     particle_step_scale: float,
     wet_depth_threshold: float,
     block_dry_cells: bool,
+    particle_integrator: str,
     trail_length: int,
     frame_duration_ms: int,
 ) -> go.Figure:
@@ -116,6 +117,7 @@ def build_particle_animation_figure(
         depth=depth,
         wet_depth_threshold=wet_depth_threshold,
         block_dry_cells=block_dry_cells,
+        integrator=particle_integrator,
     )
 
     eta_limit = max(float(np.max(np.abs(surface))) for surface in water_surfaces)
@@ -213,6 +215,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--particle-step-scale", type=float, default=0.55, help="Scale factor for particle advection.")
     parser.add_argument("--wet-depth-threshold", type=float, default=0.055, help="Minimum depth treated as wet.")
     parser.add_argument("--allow-dry-particles", action="store_true", help="Allow particles to move into dry cells.")
+    parser.add_argument(
+        "--particle-integrator",
+        choices=("euler", "rk2"),
+        default="rk2",
+        help="Particle advection integrator.",
+    )
     parser.add_argument("--trail-length", type=int, default=8, help="Number of prior frames kept in each particle trail.")
     parser.add_argument("--frame-duration-ms", type=int, default=110, help="Animation frame duration in milliseconds.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Output directory.")
@@ -241,6 +249,7 @@ def main() -> None:
         args.particle_step_scale,
         args.wet_depth_threshold,
         not args.allow_dry_particles,
+        args.particle_integrator,
         args.trail_length,
         args.frame_duration_ms,
     )

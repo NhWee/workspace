@@ -72,22 +72,25 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(loaded_v_frames is not None and len(loaded_v_frames) == len(frames), "Loaded v velocity mismatch.")
     print(f"Reloaded dataset: {dataset_path}")
 
-    seed_x, seed_y = make_particle_seeds(3, 4)
-    paths_x, paths_y, _ = trace_particles(
-        loaded_frames,
-        loaded_u_frames,
-        loaded_v_frames,
-        seed_x,
-        seed_y,
-        step_scale=0.55,
-        depth=loaded_depth,
-        wet_depth_threshold=0.055,
-        block_dry_cells=True,
-    )
     wet_mask = make_wet_mask(loaded_depth, wet_depth_threshold=0.055)
-    sampled_wet = bilinear_sample(wet_mask, paths_x.reshape(-1), paths_y.reshape(-1))
-    assert_condition(float(sampled_wet.min()) >= 0.5, "Particle path entered a dry cell.")
-    print("Validated wet/dry particle clipping.")
+    seed_x, seed_y = make_particle_seeds(3, 4)
+    for integrator in ("euler", "rk2"):
+        paths_x, paths_y, _ = trace_particles(
+            loaded_frames,
+            loaded_u_frames,
+            loaded_v_frames,
+            seed_x,
+            seed_y,
+            step_scale=0.55,
+            depth=loaded_depth,
+            wet_depth_threshold=0.055,
+            block_dry_cells=True,
+            integrator=integrator,
+        )
+        assert_condition(paths_x.shape == (len(loaded_frames), len(seed_x)), f"{integrator} particle shape mismatch.")
+        sampled_wet = bilinear_sample(wet_mask, paths_x.reshape(-1), paths_y.reshape(-1))
+        assert_condition(float(sampled_wet.min()) >= 0.5, f"{integrator} particle path entered a dry cell.")
+    print("Validated Euler/RK2 wet/dry particle clipping.")
 
     fig = build_interactive_figure(loaded_frames, loaded_depth, max_surface_points=min(48, size))
     html_path = output_dir / "workflow_validation_viewer.html"
@@ -109,6 +112,7 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
         particle_step_scale=0.55,
         wet_depth_threshold=0.055,
         block_dry_cells=True,
+        particle_integrator="rk2",
         trail_length=4,
         frame_duration_ms=90,
     )

@@ -16,7 +16,7 @@ shallow_water_particle_viewer.py는 다음 일을 합니다.
 1. velocity가 저장된 NPZ dataset을 읽습니다.
 2. 왼쪽 유입 영역 근처에 seed particle을 배치합니다.
 3. 각 프레임의 u, v velocity field를 bilinear sampling합니다.
-4. particle 위치를 속도 방향으로 조금씩 이동시킵니다.
+4. Euler 또는 RK2 midpoint 방식으로 particle 위치를 이동시킵니다.
 5. 이동 후보 위치가 dry cell이면 이전 wet 위치를 유지합니다.
 6. particle 경로를 3D Scatter3d line으로 그립니다.
 7. 최종 수면은 speed-colored surface로 표시합니다.
@@ -43,6 +43,7 @@ shallow_water_particle_viewer.py는 다음 일을 합니다.
 - --seed-count-x: x방향 seed 개수
 - --seed-count-y: y방향 seed 개수
 - --particle-step-scale: particle advection 스케일
+- --particle-integrator: particle advection 방식, euler 또는 rk2
 - --wet-depth-threshold: wet cell로 취급할 최소 수심
 - --allow-dry-particles: dry cell 진입 차단을 끄는 옵션
 - --output-dir: HTML 저장 폴더
@@ -80,6 +81,7 @@ particle path는 저장된 velocity frame을 따라 이동한 seed들의 추적 
 - 192 x 192 기본 velocity dataset에서 HTML 생성
 - HTML marker 확인: title, Plotly.newPlot, particle paths, scatter3d, surfacecolor
 - seed 6 x 8 기준 particle 48개, frame 20개 추적 확인
+- Euler/RK2 particle integrator validation 확인
 - wet/dry clipping validation 확인
 - validate_wave_workflow.py 통과
 - pip check 통과
@@ -88,7 +90,7 @@ particle path는 저장된 velocity frame을 따라 이동한 seed들의 추적 
 7. 현재 한계
 ------------
 
-- particle path는 진단용 시각화이며 정교한 Lagrangian integrator는 아닙니다.
+- 기본 particle path는 RK2 midpoint 방식이지만, 여전히 진단용 시각화입니다.
 - velocity frame 사이 시간 보간은 아직 없습니다.
 - particle은 dry cell 진입을 차단하지만, 경계 반사나 해안선 sliding 같은 정교한 처리는 아직 없습니다.
 - 현재는 전체 추적 경로를 한 번에 보여주며, particle 자체를 시간 애니메이션하지 않습니다.
@@ -104,7 +106,7 @@ particle path는 저장된 velocity frame을 따라 이동한 seed들의 추적 
 2. wet/dry boundary의 reflection/sliding 처리
 3. seed 위치를 CLI 옵션으로 더 세밀하게 설정
 4. streamline 전용 viewer
-5. Three.js 기반 particle animation
+5. RK4 또는 시간 보간 기반 particle integrator
 
 
 9. 한 줄 요약
