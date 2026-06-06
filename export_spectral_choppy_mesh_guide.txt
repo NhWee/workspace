@@ -12,7 +12,9 @@ export_spectral_choppy_mesh.py 가이드
 
 - OBJ 파일: 마지막 3D 수면 표면 mesh
 - OBJ sequence directory: 선택 사항, 저장된 모든 frame의 mesh
-- JSON metadata 파일: simulation parameter, device, vertex/normal/face count, sequence 정보 기록
+- PLY 파일: 선택 사항, steepness 기반 foam point cloud
+- PLY sequence directory: 선택 사항, 저장된 모든 frame의 foam point cloud
+- JSON metadata 파일: simulation parameter, device, vertex/normal/face count, foam/sequence 정보 기록
 
 OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
 
@@ -21,6 +23,7 @@ OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
 - 인접한 네 점은 `f v00 v01 v11 v10` quad face가 됩니다.
 - `x, y`는 choppiness 때문에 원래 정사각 격자에서 수평으로 밀립니다.
 - `z`는 FFT spectral wave의 수면 변위 `eta`입니다.
+- foam PLY는 `x y z steepness` point cloud입니다.
 
 
 2. 사용한 계산
@@ -40,6 +43,7 @@ OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
 - 중심 차분으로 각 vertex의 tangent를 구하고 cross product로 normal을 계산합니다.
 - `--sequence-output-dir`를 지정하면 모든 저장 frame을 `frame_0000.obj`,
   `frame_0001.obj` 형식으로 변환합니다.
+- viewer와 같은 steepness 기반 foam mask를 샘플링해 PLY point cloud로 저장할 수 있습니다.
 
 
 3. 실행 방법
@@ -61,6 +65,10 @@ OBJ sequence export:
 
     .\.venv\Scripts\python.exe export_spectral_choppy_mesh.py --size 128 --steps 120 --frame-every 12 --max-mesh-points 64 --sequence-output-dir outputs\spectral_choppy_mesh_sequence
 
+Foam PLY export:
+
+    .\.venv\Scripts\python.exe export_spectral_choppy_mesh.py --foam-output outputs\spectral_choppy_foam.ply --foam-sequence-output-dir outputs\spectral_choppy_foam_sequence
+
 
 4. 주요 옵션
 ------------
@@ -78,6 +86,11 @@ OBJ sequence export:
 - `--output`: OBJ 저장 경로
 - `--metadata-output`: JSON metadata 저장 경로
 - `--sequence-output-dir`: 저장된 모든 frame을 OBJ sequence로 내보낼 폴더
+- `--foam-output`: 마지막 frame의 foam point cloud PLY 저장 경로
+- `--foam-sequence-output-dir`: 저장된 모든 frame의 foam PLY sequence 폴더
+- `--foam-threshold`: foam으로 간주할 최소 steepness
+- `--max-foam-points`: frame당 최대 foam point 수
+- `--foam-z-offset`: foam point를 수면 위로 올리는 z offset
 
 
 5. 한계
@@ -89,6 +102,7 @@ OBJ sequence export:
 - breaking wave, splash, spray를 직접 계산하지 않습니다.
 - OBJ 하나는 animation을 담지 않으므로 한 frame의 geometry만 저장합니다.
 - OBJ sequence는 frame별 geometry를 저장하지만, playback timing은 별도 툴에서 지정해야 합니다.
+- PLY foam은 point cloud입니다. 실제 거품 유체 입자 simulation은 아닙니다.
 - 큰 `max-mesh-points`는 OBJ 파일을 빠르게 크게 만듭니다.
 
 
@@ -96,6 +110,6 @@ OBJ sequence export:
 -----------------
 
 - Alembic/USD 계열 animation export
-- foam mask를 별도 point cloud 또는 vertex color 데이터로 저장
+- foam mask를 vertex color 데이터로 저장
 - Three.js/WebGPU viewer에서 mesh를 직접 렌더링
 - 더 물리적인 wave breaking/foam 모델 추가
