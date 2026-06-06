@@ -20,6 +20,7 @@ export_spectral_choppy_asset_bundle.py 가이드
 - `gltf_sequence/`: frame별 glTF sequence
 - `glb_sequence/`: frame별 GLB sequence
 - `bundle_manifest.json`: 전체 산출물 경로와 summary
+- `bundle_report.md`: 선택 사항, report 스크립트로 생성하는 Markdown 요약
 
 
 2. 왜 필요한가
@@ -39,6 +40,10 @@ export_spectral_choppy_asset_bundle.py 가이드
 기본 실행:
 
     .\.venv\Scripts\python.exe export_spectral_choppy_asset_bundle.py
+
+bundle report 생성:
+
+    .\.venv\Scripts\python.exe report_spectral_choppy_asset_bundle.py --bundle-dir outputs\spectral_choppy_asset_bundle
 
 작은 smoke test:
 

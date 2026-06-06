@@ -24,6 +24,7 @@ from export_spectral_choppy_mesh import (
     write_obj_sequence,
 )
 from export_spectral_choppy_gltf import write_glb_scene, write_glb_sequence, write_gltf_scene, write_gltf_sequence
+from report_spectral_choppy_asset_bundle import write_report as write_asset_bundle_report
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
@@ -542,6 +543,12 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition((choppy_bundle_dir / "viewer.html").exists(), "Choppy asset bundle viewer missing.")
     assert_condition((choppy_bundle_dir / "final.glb").exists(), "Choppy asset bundle final GLB missing.")
     assert_condition((choppy_bundle_dir / "glb_sequence" / "frame_0000.glb").exists(), "Choppy asset bundle GLB sequence missing.")
+    choppy_bundle_report_path = write_asset_bundle_report(choppy_bundle_dir)
+    choppy_bundle_report_text = choppy_bundle_report_path.read_text(encoding="utf-8")
+    assert_condition("Spectral Choppy Wave Asset Bundle Report" in choppy_bundle_report_text, "Choppy asset bundle report title missing.")
+    assert_condition("final GLB" in choppy_bundle_report_text, "Choppy asset bundle report final GLB row missing.")
+    assert_condition("GLB sequence" in choppy_bundle_report_text, "Choppy asset bundle report GLB sequence row missing.")
+    assert_condition("missing_assets: `0`" in choppy_bundle_report_text, "Choppy asset bundle report found missing assets.")
     print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")
 
     spectral_benchmark = benchmark_spectral_size(

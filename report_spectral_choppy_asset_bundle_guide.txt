@@ -1,0 +1,63 @@
+report_spectral_choppy_asset_bundle.py 가이드
+============================================
+
+이 스크립트는 `bundle_manifest.json`을 읽어서 asset bundle의 상태를 Markdown으로
+요약합니다.
+
+
+1. 무엇을 확인하는가
+--------------------
+
+report는 다음 정보를 정리합니다.
+
+- bundle type
+- device
+- frame count
+- total asset size
+- missing asset count
+- simulation parameter
+- viewer, OBJ, PLY, glTF, GLB, sequence별 존재 여부
+- 각 asset의 file/directory size
+- geometry count: vertices, triangles, foam points
+
+
+2. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe report_spectral_choppy_asset_bundle.py --bundle-dir outputs\spectral_choppy_asset_bundle
+
+출력 경로 지정:
+
+    .\.venv\Scripts\python.exe report_spectral_choppy_asset_bundle.py --bundle-dir outputs\spectral_choppy_asset_bundle --output outputs\spectral_choppy_asset_bundle\bundle_report.md
+
+
+3. 출력
+-------
+
+기본 출력 파일:
+
+    outputs\spectral_choppy_asset_bundle\bundle_report.md
+
+report에는 `Summary`, `Simulation`, `Assets` 섹션이 포함됩니다. 누락된 asset이
+있으면 `Missing Assets` 섹션이 추가됩니다.
+
+
+4. 언제 쓰는가
+--------------
+
+- bundle export 직후 산출물 누락 여부 확인
+- 여러 parameter run의 asset 크기 비교
+- GitHub에 작업 내용을 기록하기 전 sanity check
+- 외부 3D 툴로 넘기기 전에 어떤 파일을 열어야 하는지 확인
+
+
+5. 한계
+-------
+
+이 report는 파일 구조와 manifest를 확인합니다.
+
+- glTF/GLB를 실제 렌더링하지는 않습니다.
+- viewer HTML을 브라우저에서 시각적으로 검증하지는 않습니다.
+- 물리 모델의 정확성 검증은 담당하지 않습니다.
