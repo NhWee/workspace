@@ -44,20 +44,44 @@ def write_obj_mesh(path: Path, x_grid: np.ndarray, y_grid: np.ndarray, z_grid: n
     }
 
 
-def write_metadata(path: Path, mesh_summary: dict, simulation_parameters: dict, device: torch.device) -> None:
+def write_metadata(
+    path: Path,
+    mesh_summary: dict | None,
+    simulation_parameters: dict,
+    device: torch.device,
+    sequence_summary: dict | None = None,
+) -> None:
     metadata = {
         "solver": "spectral_choppy_mesh",
-        "mesh": mesh_summary,
         "simulation": simulation_parameters,
         "device": str(device),
     }
+    if mesh_summary is not None:
+        metadata["mesh"] = mesh_summary
+    if sequence_summary is not None:
+        metadata["sequence"] = sequence_summary
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+
+def write_obj_sequence(output_dir: Path, frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]]) -> dict:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    frame_summaries = []
+    for index, (x_grid, y_grid, z_grid) in enumerate(frames):
+        frame_path = output_dir / f"frame_{index:04d}.obj"
+        frame_summaries.append(write_obj_mesh(frame_path, x_grid, y_grid, z_grid))
+
+    return {
+        "directory": str(output_dir),
+        "frame_count": len(frame_summaries),
+        "frames": frame_summaries,
+    }
 
 
 def export_final_choppy_mesh(
     output: Path,
     metadata_output: Path,
+    sequence_output_dir: Path | None,
     size: int,
     steps: int,
     frame_every: int,
@@ -98,6 +122,7 @@ def export_final_choppy_mesh(
 
     x_grid, y_grid, z_grid = frames[-1]
     mesh_summary = write_obj_mesh(output, x_grid, y_grid, z_grid)
+    sequence_summary = write_obj_sequence(sequence_output_dir, frames) if sequence_output_dir is not None else None
     simulation_parameters = {
         "size": size,
         "steps": steps,
@@ -116,8 +141,8 @@ def export_final_choppy_mesh(
         "max_mesh_points": max_mesh_points,
         "exported_frame_index": len(frames) - 1,
     }
-    write_metadata(metadata_output, mesh_summary, simulation_parameters, device)
-    return {"mesh": mesh_summary, "metadata_path": str(metadata_output)}
+    write_metadata(metadata_output, mesh_summary, simulation_parameters, device, sequence_summary)
+    return {"mesh": mesh_summary, "metadata_path": str(metadata_output), "sequence": sequence_summary}
 
 
 def parse_args() -> argparse.Namespace:
@@ -139,6 +164,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-mesh-points", type=int, default=128, help="Max exported mesh points per axis.")
     parser.add_argument("--output", type=Path, default=Path("outputs/spectral_choppy_wave_final.obj"), help="Output OBJ path.")
     parser.add_argument("--metadata-output", type=Path, default=None, help="Output metadata JSON path.")
+    parser.add_argument("--sequence-output-dir", type=Path, default=None, help="Optional directory for OBJ files for every saved frame.")
     return parser.parse_args()
 
 
@@ -153,6 +179,7 @@ def main() -> None:
     result = export_final_choppy_mesh(
         output=args.output,
         metadata_output=metadata_output,
+        sequence_output_dir=args.sequence_output_dir,
         size=args.size,
         steps=args.steps,
         frame_every=args.frame_every,
@@ -174,6 +201,9 @@ def main() -> None:
     print(f"Vertices: {result['mesh']['vertex_count']}")
     print(f"Quad faces: {result['mesh']['quad_face_count']}")
     print(f"Saved metadata: {result['metadata_path']}")
+    if result["sequence"] is not None:
+        print(f"Saved OBJ sequence: {result['sequence']['directory']}")
+        print(f"Sequence frames: {result['sequence']['frame_count']}")
 
 
 if __name__ == "__main__":

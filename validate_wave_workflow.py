@@ -14,7 +14,7 @@ from compare_wave_datasets import (
     save_frame_metric_series,
     write_summary,
 )
-from export_spectral_choppy_mesh import write_metadata, write_obj_mesh
+from export_spectral_choppy_mesh import write_metadata, write_obj_mesh, write_obj_sequence
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
@@ -384,6 +384,8 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
 
     choppy_mesh_path = output_dir / "workflow_validation_spectral_choppy_mesh.obj"
     choppy_mesh_summary = write_obj_mesh(choppy_mesh_path, choppy_x, choppy_y, choppy_z)
+    choppy_sequence_dir = output_dir / "workflow_validation_spectral_choppy_mesh_sequence"
+    choppy_sequence_summary = write_obj_sequence(choppy_sequence_dir, choppy_frames)
     choppy_metadata_path = output_dir / "workflow_validation_spectral_choppy_mesh.json"
     write_metadata(
         choppy_metadata_path,
@@ -396,14 +398,24 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
             "choppiness": 0.7,
         },
         device,
+        choppy_sequence_summary,
     )
     choppy_mesh_text = choppy_mesh_path.read_text(encoding="utf-8")
+    choppy_sequence_frame_path = choppy_sequence_dir / "frame_0000.obj"
+    choppy_sequence_text = choppy_sequence_frame_path.read_text(encoding="utf-8")
     choppy_metadata_text = choppy_metadata_path.read_text(encoding="utf-8")
     assert_condition("\nv " in choppy_mesh_text, "Choppy OBJ mesh is missing vertices.")
     assert_condition("\nf " in choppy_mesh_text, "Choppy OBJ mesh is missing faces.")
+    assert_condition("\nv " in choppy_sequence_text, "Choppy OBJ sequence frame is missing vertices.")
+    assert_condition("\nf " in choppy_sequence_text, "Choppy OBJ sequence frame is missing faces.")
     assert_condition("spectral_choppy_mesh" in choppy_metadata_text, "Choppy mesh metadata solver marker missing.")
+    assert_condition("\"sequence\"" in choppy_metadata_text, "Choppy mesh metadata sequence marker missing.")
     assert_condition(choppy_mesh_summary["vertex_count"] > 0, "Choppy OBJ mesh has no vertices.")
     assert_condition(choppy_mesh_summary["quad_face_count"] > 0, "Choppy OBJ mesh has no faces.")
+    assert_condition(
+        choppy_sequence_summary["frame_count"] == len(choppy_frames),
+        "Choppy OBJ sequence frame count mismatch.",
+    )
     print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")
 
     spectral_benchmark = benchmark_spectral_size(

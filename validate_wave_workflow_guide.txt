@@ -35,7 +35,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 20. streamline HTML marker 확인
 21. spectral wave velocity dataset과 Plotly/speed viewer 생성 확인
 22. spectral choppy wave viewer 생성 확인
-23. spectral choppy wave OBJ mesh export 확인
+23. spectral choppy wave OBJ mesh와 OBJ sequence export 확인
 24. spectral wave benchmark metric/chart 확인
 25. bathymetry/spectral solver benchmark comparison 확인
 
@@ -72,6 +72,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - workflow_validation_spectral_choppy_viewer.html
 - workflow_validation_spectral_choppy_mesh.obj
 - workflow_validation_spectral_choppy_mesh.json
+- workflow_validation_spectral_choppy_mesh_sequence/
 - workflow_validation_spectral_benchmark.html
 - workflow_validation_solver_benchmark/
 
@@ -102,7 +103,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - streamline HTML 생성 성공
 - spectral wave velocity dataset/viewer 생성 성공
 - spectral choppy wave viewer 생성 성공
-- spectral choppy wave OBJ mesh export 확인 성공
+- spectral choppy wave OBJ mesh/sequence export 확인 성공
 - spectral wave benchmark metric/chart 확인 성공
 - solver benchmark comparison CSV/HTML 생성 성공
 - pip check 통과

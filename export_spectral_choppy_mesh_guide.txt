@@ -1,8 +1,8 @@
 export_spectral_choppy_mesh.py 가이드
 ====================================
 
-이 스크립트는 GPU FFT 기반 choppy wave simulation의 마지막 frame을 OBJ mesh로
-내보냅니다.
+이 스크립트는 GPU FFT 기반 choppy wave simulation의 마지막 frame 또는 저장된
+모든 frame을 OBJ mesh로 내보냅니다.
 
 
 1. 무엇을 만드는가
@@ -10,8 +10,9 @@ export_spectral_choppy_mesh.py 가이드
 
 출력은 두 가지입니다.
 
-- OBJ 파일: 3D 수면 표면 mesh
-- JSON metadata 파일: simulation parameter, device, vertex/face count 기록
+- OBJ 파일: 마지막 3D 수면 표면 mesh
+- OBJ sequence directory: 선택 사항, 저장된 모든 frame의 mesh
+- JSON metadata 파일: simulation parameter, device, vertex/face count, sequence 정보 기록
 
 OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
 
@@ -35,6 +36,8 @@ OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
 - inverse FFT로 수면 높이 `eta(x, y, t)`를 얻습니다.
 - `kx / |k|`, `ky / |k|` 방향 성분으로 수평 displacement를 계산합니다.
 - 마지막 저장 frame의 `(x, y, z)` grid를 OBJ로 변환합니다.
+- `--sequence-output-dir`를 지정하면 모든 저장 frame을 `frame_0000.obj`,
+  `frame_0001.obj` 형식으로 변환합니다.
 
 
 3. 실행 방법
@@ -52,6 +55,10 @@ OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
 
     .\.venv\Scripts\python.exe export_spectral_choppy_mesh.py --size 512 --steps 720 --frame-every 24 --max-mesh-points 256 --output outputs\spectral_choppy_wave_256.obj
 
+OBJ sequence export:
+
+    .\.venv\Scripts\python.exe export_spectral_choppy_mesh.py --size 128 --steps 120 --frame-every 12 --max-mesh-points 64 --sequence-output-dir outputs\spectral_choppy_mesh_sequence
+
 
 4. 주요 옵션
 ------------
@@ -68,6 +75,7 @@ OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
 - `--max-mesh-points`: OBJ로 내보낼 한 축 최대 점 수
 - `--output`: OBJ 저장 경로
 - `--metadata-output`: JSON metadata 저장 경로
+- `--sequence-output-dir`: 저장된 모든 frame을 OBJ sequence로 내보낼 폴더
 
 
 5. 한계
@@ -77,14 +85,15 @@ OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
 
 - volume fluid simulation은 아닙니다.
 - breaking wave, splash, spray를 직접 계산하지 않습니다.
-- OBJ는 animation을 담지 않으므로 한 frame의 geometry만 저장합니다.
+- OBJ 하나는 animation을 담지 않으므로 한 frame의 geometry만 저장합니다.
+- OBJ sequence는 frame별 geometry를 저장하지만, playback timing은 별도 툴에서 지정해야 합니다.
 - 큰 `max-mesh-points`는 OBJ 파일을 빠르게 크게 만듭니다.
 
 
 6. 다음 개발 방향
 -----------------
 
-- 여러 frame을 연속 OBJ 또는 Alembic/USD 계열로 export
+- Alembic/USD 계열 animation export
 - vertex normal 계산 추가
 - foam mask를 별도 point cloud 또는 vertex color 데이터로 저장
 - Three.js/WebGPU viewer에서 mesh를 직접 렌더링
