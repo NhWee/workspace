@@ -1,6 +1,7 @@
 import argparse
 import base64
 import json
+import struct
 from pathlib import Path
 
 import numpy as np
@@ -16,6 +17,10 @@ GL_FLOAT = 5126
 GL_UNSIGNED_INT = 5125
 GL_POINTS = 0
 GL_TRIANGLES = 4
+GLB_MAGIC = 0x46546C67
+GLB_VERSION = 2
+GLB_JSON_CHUNK = 0x4E4F534A
+GLB_BIN_CHUNK = 0x004E4942
 
 
 def make_triangle_indices(rows: int, cols: int) -> np.ndarray:
@@ -67,14 +72,14 @@ def append_buffer(
     return len(accessors) - 1
 
 
-def write_gltf_scene(
-    path: Path,
+def build_gltf_document(
     x_grid: np.ndarray,
     y_grid: np.ndarray,
     z_grid: np.ndarray,
     foam_threshold: float,
     max_foam_points: int,
     foam_z_offset: float,
+    embed_buffer: bool,
 ) -> dict:
     if x_grid.shape != y_grid.shape or x_grid.shape != z_grid.shape:
         raise ValueError("x_grid, y_grid, and z_grid must have the same shape.")
@@ -142,7 +147,9 @@ def write_gltf_scene(
         )
 
     buffer_data = b"".join(chunks)
-    data_uri = "data:application/octet-stream;base64," + base64.b64encode(buffer_data).decode("ascii")
+    buffer = {"byteLength": len(buffer_data)}
+    if embed_buffer:
+        buffer["uri"] = "data:application/octet-stream;base64," + base64.b64encode(buffer_data).decode("ascii")
     gltf = {
         "asset": {"version": "2.0", "generator": "export_spectral_choppy_gltf.py"},
         "scene": 0,
@@ -168,15 +175,11 @@ def write_gltf_scene(
                 },
             },
         ],
-        "buffers": [{"uri": data_uri, "byteLength": len(buffer_data)}],
+        "buffers": [buffer],
         "bufferViews": buffer_views,
         "accessors": accessors,
     }
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(gltf, indent=2), encoding="utf-8")
-    return {
-        "path": str(path),
+    summary = {
         "rows": rows,
         "cols": cols,
         "vertex_count": int(len(positions)),
@@ -185,6 +188,79 @@ def write_gltf_scene(
         "foam_point_count": foam_point_count,
         "byte_length": len(buffer_data),
     }
+    return {"gltf": gltf, "buffer_data": buffer_data, "summary": summary}
+
+
+def write_gltf_scene(
+    path: Path,
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    z_grid: np.ndarray,
+    foam_threshold: float,
+    max_foam_points: int,
+    foam_z_offset: float,
+) -> dict:
+    document = build_gltf_document(
+        x_grid,
+        y_grid,
+        z_grid,
+        foam_threshold=foam_threshold,
+        max_foam_points=max_foam_points,
+        foam_z_offset=foam_z_offset,
+        embed_buffer=True,
+    )
+    summary = document["summary"]
+    summary["path"] = str(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document["gltf"], indent=2), encoding="utf-8")
+    return summary
+
+
+def pad_bytes(data: bytes, multiple: int, pad_byte: bytes) -> bytes:
+    remainder = len(data) % multiple
+    if remainder == 0:
+        return data
+    return data + pad_byte * (multiple - remainder)
+
+
+def write_glb_scene(
+    path: Path,
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    z_grid: np.ndarray,
+    foam_threshold: float,
+    max_foam_points: int,
+    foam_z_offset: float,
+) -> dict:
+    document = build_gltf_document(
+        x_grid,
+        y_grid,
+        z_grid,
+        foam_threshold=foam_threshold,
+        max_foam_points=max_foam_points,
+        foam_z_offset=foam_z_offset,
+        embed_buffer=False,
+    )
+    gltf_json = json.dumps(document["gltf"], separators=(",", ":")).encode("utf-8")
+    json_chunk = pad_bytes(gltf_json, 4, b" ")
+    bin_chunk = pad_bytes(document["buffer_data"], 4, b"\x00")
+    total_length = 12 + 8 + len(json_chunk) + 8 + len(bin_chunk)
+    glb = b"".join(
+        [
+            struct.pack("<III", GLB_MAGIC, GLB_VERSION, total_length),
+            struct.pack("<II", len(json_chunk), GLB_JSON_CHUNK),
+            json_chunk,
+            struct.pack("<II", len(bin_chunk), GLB_BIN_CHUNK),
+            bin_chunk,
+        ]
+    )
+
+    summary = document["summary"]
+    summary["path"] = str(path)
+    summary["glb_length"] = len(glb)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(glb)
+    return summary
 
 
 def write_gltf_sequence(
@@ -228,6 +304,7 @@ def write_gltf_sequence(
 
 def export_final_choppy_gltf(
     output: Path,
+    glb_output: Path | None,
     sequence_output_dir: Path | None,
     size: int,
     steps: int,
@@ -280,6 +357,19 @@ def export_final_choppy_gltf(
         max_foam_points=max_foam_points,
         foam_z_offset=foam_z_offset,
     )
+    glb_summary = (
+        write_glb_scene(
+            glb_output,
+            x_grid,
+            y_grid,
+            z_grid,
+            foam_threshold=foam_threshold,
+            max_foam_points=max_foam_points,
+            foam_z_offset=foam_z_offset,
+        )
+        if glb_output is not None
+        else None
+    )
     sequence_summary = (
         write_gltf_sequence(
             sequence_output_dir,
@@ -291,7 +381,7 @@ def export_final_choppy_gltf(
         if sequence_output_dir is not None
         else None
     )
-    return {"final": final_summary, "sequence": sequence_summary}
+    return {"final": final_summary, "glb": glb_summary, "sequence": sequence_summary}
 
 
 def parse_args() -> argparse.Namespace:
@@ -315,6 +405,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-foam-points", type=int, default=900, help="Maximum exported foam points.")
     parser.add_argument("--foam-z-offset", type=float, default=0.01, help="Vertical offset applied to exported foam points.")
     parser.add_argument("--output", type=Path, default=Path("outputs/spectral_choppy_wave_final.gltf"), help="Output glTF path.")
+    parser.add_argument("--glb-output", type=Path, default=None, help="Optional output binary GLB path for the final frame.")
     parser.add_argument("--sequence-output-dir", type=Path, default=None, help="Optional directory for glTF files for every saved frame.")
     return parser.parse_args()
 
@@ -328,6 +419,7 @@ def main() -> None:
 
     summary = export_final_choppy_gltf(
         output=args.output,
+        glb_output=args.glb_output,
         sequence_output_dir=args.sequence_output_dir,
         size=args.size,
         steps=args.steps,
@@ -353,6 +445,9 @@ def main() -> None:
     print(f"Vertices: {summary['final']['vertex_count']}")
     print(f"Triangles: {summary['final']['triangle_count']}")
     print(f"Foam points: {summary['final']['foam_point_count']}")
+    if summary["glb"] is not None:
+        print(f"Saved GLB: {summary['glb']['path']}")
+        print(f"GLB bytes: {summary['glb']['glb_length']}")
     if summary["sequence"] is not None:
         print(f"Saved glTF sequence: {summary['sequence']['directory']}")
         print(f"Sequence frames: {summary['sequence']['frame_count']}")

@@ -8,13 +8,15 @@ scene으로 저장합니다.
 1. 무엇을 만드는가
 ------------------
 
-기본 출력은 embedded `.gltf` 파일 하나입니다. `--sequence-output-dir`를 지정하면
+기본 출력은 embedded `.gltf` 파일 하나입니다. `--glb-output`를 지정하면 같은
+final frame을 binary `.glb`로도 저장합니다. `--sequence-output-dir`를 지정하면
 저장된 모든 frame을 개별 embedded `.gltf` 파일로 내보내고 manifest를 함께 저장합니다.
 
 - water surface: triangle mesh primitive
 - water normal: vertex normal attribute
 - foam layer: point primitive
 - binary data: base64 data URI로 glTF 내부에 포함
+- GLB: JSON chunk와 binary chunk를 하나의 binary 파일로 저장
 - sequence manifest: frame별 glTF 파일 경로와 요약 정보
 
 OBJ/PLY export는 파일을 역할별로 나누는 방식이고, glTF export는 final frame의
@@ -51,7 +53,7 @@ foam layer:
 
 고해상도 final frame export:
 
-    .\.venv\Scripts\python.exe export_spectral_choppy_gltf.py --size 512 --steps 720 --frame-every 24 --max-surface-points 256 --output outputs\spectral_choppy_wave_final.gltf
+    .\.venv\Scripts\python.exe export_spectral_choppy_gltf.py --size 512 --steps 720 --frame-every 24 --max-surface-points 256 --output outputs\spectral_choppy_wave_final.gltf --glb-output outputs\spectral_choppy_wave_final.glb
 
 glTF sequence export:
 
@@ -70,6 +72,7 @@ glTF sequence export:
 - `--max-foam-points`: 최대 foam point 수
 - `--foam-z-offset`: foam point를 수면 위로 올리는 z offset
 - `--output`: glTF 저장 경로
+- `--glb-output`: final frame GLB 저장 경로
 - `--sequence-output-dir`: 저장된 모든 frame을 glTF sequence로 내보낼 폴더
 
 
@@ -81,12 +84,13 @@ glTF sequence export:
 - animation clip은 아직 포함하지 않습니다. sequence export는 frame별 scene 파일입니다.
 - foam은 point primitive이며 실제 유체 입자 simulation은 아닙니다.
 - embedded base64 방식이므로 큰 grid에서는 파일 크기가 빠르게 커집니다.
+- GLB는 final frame만 지원합니다. sequence는 현재 `.gltf` 파일 묶음으로 저장합니다.
 
 
 6. 다음 개발 방향
 -----------------
 
-- glTF animation 또는 `.glb` binary export
+- glTF animation 또는 GLB sequence export
 - Three.js/WebGPU viewer에서 glTF 직접 렌더링
 - foam point size/material을 viewer 쪽에서 제어
 - wave breaking과 spray를 더 물리적인 모델로 분리
