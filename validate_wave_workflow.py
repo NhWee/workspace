@@ -17,6 +17,7 @@ from compare_wave_datasets import (
 )
 from compare_spectral_choppy_asset_bundles import write_comparison as write_asset_bundle_comparison
 from export_spectral_choppy_asset_bundle import write_asset_bundle
+from evaluate_spectral_choppy_wave import evaluate_choppy_frames, write_metric_outputs
 from export_spectral_choppy_mesh import (
     write_foam_ply,
     write_foam_sequence,
@@ -394,6 +395,15 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("foam highlights" in choppy_html_text, "Choppy HTML is missing foam highlights trace.")
     print(f"Validated spectral choppy wave viewer: {choppy_html_path}")
 
+    choppy_metrics = evaluate_choppy_frames(choppy_frames, domain_size=8.0, foam_threshold=0.0)
+    choppy_metric_outputs = write_metric_outputs(choppy_metrics, output_dir / "workflow_validation_spectral_choppy_metrics")
+    choppy_metric_report = Path(choppy_metric_outputs["report"]).read_text(encoding="utf-8")
+    assert_condition(choppy_metric_outputs["summary"]["frame_count"] == len(choppy_frames), "Choppy metrics frame count mismatch.")
+    assert_condition(choppy_metric_outputs["summary"]["steepness_max_max"] > 0.0, "Choppy metrics steepness max should be positive.")
+    assert_condition("horizontal_displacement_p95_max" in choppy_metric_report, "Choppy metrics report displacement metric missing.")
+    assert_condition(Path(choppy_metric_outputs["csv"]).exists(), "Choppy metrics CSV missing.")
+    assert_condition(Path(choppy_metric_outputs["json"]).exists(), "Choppy metrics JSON missing.")
+
     choppy_mesh_path = output_dir / "workflow_validation_spectral_choppy_mesh.obj"
     choppy_mesh_summary = write_obj_mesh(choppy_mesh_path, choppy_x, choppy_y, choppy_z)
     choppy_sequence_dir = output_dir / "workflow_validation_spectral_choppy_mesh_sequence"
@@ -545,9 +555,13 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition((choppy_bundle_dir / "viewer.html").exists(), "Choppy asset bundle viewer missing.")
     assert_condition((choppy_bundle_dir / "final.glb").exists(), "Choppy asset bundle final GLB missing.")
     assert_condition((choppy_bundle_dir / "glb_sequence" / "frame_0000.glb").exists(), "Choppy asset bundle GLB sequence missing.")
+    assert_condition("metrics" in choppy_bundle_manifest, "Choppy asset bundle metrics missing.")
+    assert_condition((choppy_bundle_dir / "choppy_wave_metrics.csv").exists(), "Choppy asset bundle metric CSV missing.")
+    assert_condition(choppy_bundle_manifest["metrics"]["summary"]["frame_count"] == len(choppy_frames), "Choppy asset bundle metric frame count mismatch.")
     choppy_bundle_report_path = write_asset_bundle_report(choppy_bundle_dir)
     choppy_bundle_report_text = choppy_bundle_report_path.read_text(encoding="utf-8")
     assert_condition("Spectral Choppy Wave Asset Bundle Report" in choppy_bundle_report_text, "Choppy asset bundle report title missing.")
+    assert_condition("## Metrics" in choppy_bundle_report_text, "Choppy asset bundle report metrics section missing.")
     assert_condition("final GLB" in choppy_bundle_report_text, "Choppy asset bundle report final GLB row missing.")
     assert_condition("GLB sequence" in choppy_bundle_report_text, "Choppy asset bundle report GLB sequence row missing.")
     assert_condition("missing_assets: `0`" in choppy_bundle_report_text, "Choppy asset bundle report found missing assets.")
@@ -556,6 +570,7 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     choppy_bundle_comparison_text = choppy_bundle_comparison_path.read_text(encoding="utf-8")
     assert_condition("Spectral Choppy Wave Asset Bundle Comparison" in choppy_bundle_comparison_text, "Choppy asset bundle comparison title missing.")
     assert_condition("GLB Seq Frames" in choppy_bundle_comparison_text, "Choppy asset bundle comparison GLB sequence column missing.")
+    assert_condition("Steepness P95 Max" in choppy_bundle_comparison_text, "Choppy asset bundle comparison metric column missing.")
     assert_condition("workflow_validation_spectral_choppy_asset_bundle" in choppy_bundle_comparison_text, "Choppy asset bundle comparison row missing.")
     choppy_bundle_sweep = run_asset_bundle_sweep(
         argparse.Namespace(
@@ -588,6 +603,8 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(len(choppy_bundle_sweep["runs"]) == 2, "Choppy asset bundle sweep should create two runs.")
     assert_condition("00_choppiness_0p45" in choppy_bundle_sweep_text, "Choppy asset bundle sweep first run missing.")
     assert_condition("01_choppiness_0p75" in choppy_bundle_sweep_text, "Choppy asset bundle sweep second run missing.")
+    assert_condition("Steepness P95 Max" in choppy_bundle_sweep_text, "Choppy asset bundle sweep comparison metric column missing.")
+    assert_condition("metrics" in choppy_bundle_sweep["runs"][0], "Choppy asset bundle sweep run metrics missing.")
     print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")
 
     spectral_benchmark = benchmark_spectral_size(

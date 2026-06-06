@@ -68,6 +68,7 @@ def run_asset_bundle_sweep(args: argparse.Namespace, device: torch.device) -> di
                 "manifest": str(manifest_path),
                 "report": str(report_path),
                 "frame_count": manifest["frame_count"],
+                "metrics": manifest.get("metrics", {}).get("summary", {}),
             }
         )
 

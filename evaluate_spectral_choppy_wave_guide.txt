@@ -1,0 +1,73 @@
+evaluate_spectral_choppy_wave.py 가이드
+=====================================
+
+이 스크립트는 spectral choppy wave surface를 생성한 뒤 frame별 품질 metric을 계산합니다.
+목적은 parameter sweep에서 "보기 좋은 후보"를 감으로만 고르지 않고, 높이/경사/foam/수평 변위 값을 같이 비교하는 것입니다.
+
+
+1. 무엇을 계산하는가
+------------------
+
+frame별 metric:
+
+- `eta_min`, `eta_max`, `eta_mean`, `eta_std`, `eta_range`
+- `steepness_mean`, `steepness_p95`, `steepness_max`
+- `foam_point_count`, `foam_ratio`
+- `horizontal_displacement_mean`, `horizontal_displacement_p95`, `horizontal_displacement_max`
+
+전체 summary:
+
+- 각 frame metric의 평균과 최대값
+- 비교에서 자주 쓰는 `eta_range_max`, `steepness_p95_max`, `foam_ratio_mean`,
+  `horizontal_displacement_p95_max`
+
+
+2. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe evaluate_spectral_choppy_wave.py
+
+작은 smoke test:
+
+    .\.venv\Scripts\python.exe evaluate_spectral_choppy_wave.py --size 64 --steps 48 --frame-every 12 --max-surface-points 32 --foam-threshold 0.0 --output-dir outputs\spectral_choppy_wave_metrics_smoke
+
+choppiness가 큰 후보 평가:
+
+    .\.venv\Scripts\python.exe evaluate_spectral_choppy_wave.py --choppiness 1.05 --output-dir outputs\spectral_choppy_wave_metrics_choppy_1p05
+
+
+3. 출력
+-------
+
+기본 출력 폴더:
+
+    outputs\spectral_choppy_wave_metrics
+
+주요 산출물:
+
+- `choppy_wave_metrics.csv`: frame별 metric
+- `choppy_wave_metrics.json`: frame별 metric과 summary
+- `choppy_wave_metrics.md`: 사람이 읽기 쉬운 요약 report
+
+asset bundle export를 실행할 때도 같은 metric 산출물이 bundle 폴더 안에 자동 생성됩니다.
+
+
+4. 해석 기준
+------------
+
+- `eta_range_max`: 수면 높낮이의 최대 폭입니다. 너무 작으면 파도가 약하고, 너무 크면 시각적으로 과격할 수 있습니다.
+- `steepness_p95_max`: 대부분의 날카로운 파도 경사를 대표합니다. foam 후보와 시각적 choppy 느낌을 볼 때 유용합니다.
+- `foam_ratio_mean`: foam threshold를 넘은 point 비율입니다. 너무 높으면 foam이 과밀해질 수 있습니다.
+- `horizontal_displacement_p95_max`: choppiness로 생긴 수평 변위 크기입니다. 너무 크면 mesh가 접히거나 비현실적으로 보일 수 있습니다.
+
+
+5. 한계
+-------
+
+이 metric은 downsample된 surface 기준입니다.
+
+- 물리적으로 정확한 breaking wave 판정은 아닙니다.
+- foam은 steepness threshold 기반의 시각적 후보입니다.
+- mesh self-intersection 검사는 아직 포함하지 않습니다.

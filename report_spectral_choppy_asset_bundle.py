@@ -60,6 +60,7 @@ def build_report(manifest_path: Path) -> str:
     missing = [row["asset"] for row in rows if not row["exists"]]
     total_size = sum(row["size_bytes"] for row in rows)
     simulation = manifest.get("simulation", {})
+    metric_summary = manifest.get("metrics", {}).get("summary", {})
 
     lines = [
         "# Spectral Choppy Wave Asset Bundle Report",
@@ -79,6 +80,23 @@ def build_report(manifest_path: Path) -> str:
     ]
     for key in sorted(simulation):
         lines.append(f"| `{key}` | `{simulation[key]}` |")
+
+    if metric_summary:
+        lines.extend(
+            [
+                "",
+                "## Metrics",
+                "",
+                "| Metric | Value |",
+                "| --- | ---: |",
+                f"| eta_range_max | `{metric_summary.get('eta_range_max', '')}` |",
+                f"| eta_std_mean | `{metric_summary.get('eta_std_mean', '')}` |",
+                f"| steepness_p95_max | `{metric_summary.get('steepness_p95_max', '')}` |",
+                f"| foam_ratio_mean | `{metric_summary.get('foam_ratio_mean', '')}` |",
+                f"| foam_point_count_max | `{metric_summary.get('foam_point_count_max', '')}` |",
+                f"| horizontal_displacement_p95_max | `{metric_summary.get('horizontal_displacement_p95_max', '')}` |",
+            ]
+        )
 
     lines.extend(
         [

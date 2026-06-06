@@ -14,6 +14,7 @@ bundle comparison Markdown까지 만듭니다.
 - `foam_threshold`: foam point로 분류할 steepness 기준
 
 각 run은 독립 asset bundle 디렉터리를 만들고, run별 `bundle_report.md`를 생성합니다.
+각 bundle에는 choppy wave metric CSV/JSON/Markdown도 포함됩니다.
 마지막에는 모든 run을 모아 `bundle_comparison.md`를 생성합니다.
 
 
@@ -50,6 +51,7 @@ foam threshold sweep:
 - `01_<parameter>_<value>/`: 두 번째 asset bundle
 - 각 run의 `bundle_manifest.json`
 - 각 run의 `bundle_report.md`
+- 각 run의 `choppy_wave_metrics.csv`, `choppy_wave_metrics.json`, `choppy_wave_metrics.md`
 - `bundle_comparison.md`
 - `sweep_manifest.json`
 
@@ -57,8 +59,8 @@ foam threshold sweep:
 4. 언제 쓰는가
 --------------
 
-- choppiness 변화가 geometry 크기와 foam point에 미치는 영향 확인
-- foam threshold가 point cloud 수에 미치는 영향 확인
+- choppiness 변화가 geometry 크기, horizontal displacement, foam point에 미치는 영향 확인
+- foam threshold가 point cloud 수와 foam ratio에 미치는 영향 확인
 - 고해상도 export 전에 작은 grid로 parameter 후보를 좁힐 때
 - 여러 run을 GitHub에 기록하기 전 비교표로 정리할 때
 

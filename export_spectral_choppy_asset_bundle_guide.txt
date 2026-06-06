@@ -84,3 +84,16 @@ bundle report 생성:
 - animation clip이 포함된 glTF/GLB export
 - Three.js/WebGPU viewer에서 bundle manifest를 직접 읽어 playback
 - 더 물리적인 breaking wave와 spray layer 추가
+
+
+7. metric 산출물
+----------------
+
+asset bundle export는 다음 metric 파일도 자동 생성합니다.
+
+- `choppy_wave_metrics.csv`: frame별 height/steepness/foam/displacement metric
+- `choppy_wave_metrics.json`: frame별 metric과 summary
+- `choppy_wave_metrics.md`: 사람이 읽기 쉬운 metric 요약
+
+이 값은 `bundle_manifest.json`의 `metrics.summary`에도 들어가며,
+bundle report와 bundle comparison에서 핵심 값을 비교할 수 있습니다.

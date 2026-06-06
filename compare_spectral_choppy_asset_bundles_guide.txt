@@ -17,6 +17,10 @@ Markdown 비교 표를 만듭니다.
 - max_surface_points
 - choppiness
 - foam_threshold
+- eta_range_max
+- steepness_p95_max
+- foam_ratio_mean
+- horizontal_displacement_p95_max
 - total asset size
 - final GLB size
 - final GLB vertex/triangle/foam point count
@@ -47,14 +51,14 @@ manifest 파일을 직접 지정:
 
     outputs\spectral_choppy_asset_bundle_comparison.md
 
-이 파일은 parameter sweep 또는 여러 해상도 실험의 결과 크기와 geometry 규모를
+이 파일은 parameter sweep 또는 여러 해상도 실험의 결과 크기, geometry 규모, 주요 choppy metric을
 빠르게 비교하는 데 사용합니다.
 
 
 4. 한계
 -------
 
-이 비교는 asset 규모와 manifest 정보를 비교합니다.
+이 비교는 asset 규모, manifest 정보, downsampled surface metric을 비교합니다.
 
 - 실제 렌더링 품질을 비교하지 않습니다.
 - 물리 모델 정확도를 비교하지 않습니다.

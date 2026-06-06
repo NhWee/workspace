@@ -6,6 +6,7 @@ import torch
 
 from export_spectral_choppy_gltf import write_glb_scene, write_glb_sequence, write_gltf_scene, write_gltf_sequence
 from export_spectral_choppy_mesh import write_foam_ply, write_foam_sequence, write_obj_mesh, write_obj_sequence
+from evaluate_spectral_choppy_wave import evaluate_choppy_frames, write_metric_outputs
 from spectral_choppy_wave_viewer import build_choppy_figure, simulate_choppy_frames
 
 
@@ -84,6 +85,10 @@ def write_asset_bundle(
         max_foam_points=max_foam_points,
         foam_z_offset=foam_z_offset,
     )
+    metric_summary = write_metric_outputs(
+        evaluate_choppy_frames(frames, domain_size, foam_threshold),
+        output_dir,
+    )
 
     manifest = {
         "bundle": "spectral_choppy_wave_asset_bundle",
@@ -99,6 +104,7 @@ def write_asset_bundle(
         "glb": glb_summary,
         "gltf_sequence": gltf_sequence_summary,
         "glb_sequence": glb_sequence_summary,
+        "metrics": metric_summary,
     }
     manifest_path = output_dir / "bundle_manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")

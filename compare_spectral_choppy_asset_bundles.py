@@ -32,6 +32,7 @@ def summarize_bundle(path: Path) -> dict:
     simulation = manifest.get("simulation", {})
     glb = manifest.get("glb", {})
     glb_sequence = manifest.get("glb_sequence", {})
+    metric_summary = manifest.get("metrics", {}).get("summary", {})
     return {
         "name": bundle_dir.name,
         "manifest": str(manifest_path),
@@ -50,6 +51,10 @@ def summarize_bundle(path: Path) -> dict:
         "glb_triangles": glb.get("triangle_count", ""),
         "glb_foam_points": glb.get("foam_point_count", ""),
         "glb_sequence_frames": glb_sequence.get("frame_count", ""),
+        "eta_range_max": metric_summary.get("eta_range_max", ""),
+        "steepness_p95_max": metric_summary.get("steepness_p95_max", ""),
+        "foam_ratio_mean": metric_summary.get("foam_ratio_mean", ""),
+        "horizontal_displacement_p95_max": metric_summary.get("horizontal_displacement_p95_max", ""),
     }
 
 
@@ -57,12 +62,12 @@ def build_comparison_table(summaries: list[dict]) -> str:
     lines = [
         "# Spectral Choppy Wave Asset Bundle Comparison",
         "",
-        "| Bundle | Frames | Grid | Steps | Frame Every | Surface Points | Choppiness | Foam Threshold | Total Size | GLB Size | Vertices | Triangles | Foam Points | GLB Seq Frames | Missing |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Bundle | Frames | Grid | Steps | Frame Every | Surface Points | Choppiness | Foam Threshold | Eta Range Max | Steepness P95 Max | Foam Ratio Mean | Disp P95 Max | Total Size | GLB Size | Vertices | Triangles | Foam Points | GLB Seq Frames | Missing |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for summary in summaries:
         lines.append(
-            "| {name} | {frame_count} | {size} | {steps} | {frame_every} | {max_surface_points} | {choppiness} | {foam_threshold} | {total_size} | {glb_size} | {vertices} | {triangles} | {foam_points} | {glb_sequence_frames} | {missing_assets} |".format(
+            "| {name} | {frame_count} | {size} | {steps} | {frame_every} | {max_surface_points} | {choppiness} | {foam_threshold} | {eta_range_max} | {steepness_p95_max} | {foam_ratio_mean} | {horizontal_displacement_p95_max} | {total_size} | {glb_size} | {vertices} | {triangles} | {foam_points} | {glb_sequence_frames} | {missing_assets} |".format(
                 name=summary["name"],
                 frame_count=summary["frame_count"],
                 size=summary["size"],
@@ -71,6 +76,10 @@ def build_comparison_table(summaries: list[dict]) -> str:
                 max_surface_points=summary["max_surface_points"],
                 choppiness=summary["choppiness"],
                 foam_threshold=summary["foam_threshold"],
+                eta_range_max=summary["eta_range_max"],
+                steepness_p95_max=summary["steepness_p95_max"],
+                foam_ratio_mean=summary["foam_ratio_mean"],
+                horizontal_displacement_p95_max=summary["horizontal_displacement_p95_max"],
                 total_size=format_bytes(summary["total_size_bytes"]),
                 glb_size=format_bytes(int(summary["glb_size_bytes"] or 0)),
                 vertices=summary["glb_vertices"],
