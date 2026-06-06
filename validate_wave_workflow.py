@@ -1,4 +1,5 @@
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,7 @@ from export_spectral_choppy_mesh import (
     write_obj_mesh,
     write_obj_sequence,
 )
+from export_spectral_choppy_gltf import write_gltf_scene
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
@@ -410,6 +412,16 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
         max_foam_points=64,
         z_offset=0.01,
     )
+    choppy_gltf_path = output_dir / "workflow_validation_spectral_choppy_scene.gltf"
+    choppy_gltf_summary = write_gltf_scene(
+        choppy_gltf_path,
+        choppy_x,
+        choppy_y,
+        choppy_z,
+        foam_threshold=0.0,
+        max_foam_points=64,
+        foam_z_offset=0.01,
+    )
     choppy_metadata_path = output_dir / "workflow_validation_spectral_choppy_mesh.json"
     write_metadata(
         choppy_metadata_path,
@@ -432,6 +444,7 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     choppy_foam_text = choppy_foam_path.read_text(encoding="utf-8")
     choppy_foam_sequence_frame_path = choppy_foam_sequence_dir / "foam_0000.ply"
     choppy_foam_sequence_text = choppy_foam_sequence_frame_path.read_text(encoding="utf-8")
+    choppy_gltf = json.loads(choppy_gltf_path.read_text(encoding="utf-8"))
     choppy_metadata_text = choppy_metadata_path.read_text(encoding="utf-8")
     assert_condition("\nv " in choppy_mesh_text, "Choppy OBJ mesh is missing vertices.")
     assert_condition("\nvn " in choppy_mesh_text, "Choppy OBJ mesh is missing vertex normals.")
@@ -460,6 +473,11 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
         choppy_foam_sequence_summary["frame_count"] == len(choppy_frames),
         "Choppy foam sequence frame count mismatch.",
     )
+    assert_condition(choppy_gltf["asset"]["version"] == "2.0", "Choppy glTF version mismatch.")
+    assert_condition(choppy_gltf["buffers"][0]["uri"].startswith("data:application/octet-stream;base64,"), "Choppy glTF buffer is not embedded.")
+    assert_condition(len(choppy_gltf["meshes"][0]["primitives"]) == 2, "Choppy glTF should contain water and foam primitives.")
+    assert_condition(choppy_gltf_summary["triangle_count"] > 0, "Choppy glTF has no triangles.")
+    assert_condition(choppy_gltf_summary["foam_point_count"] > 0, "Choppy glTF has no foam points.")
     print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")
 
     spectral_benchmark = benchmark_spectral_size(

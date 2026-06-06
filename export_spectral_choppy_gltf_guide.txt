@@ -1,0 +1,85 @@
+export_spectral_choppy_gltf.py 가이드
+====================================
+
+이 스크립트는 GPU FFT 기반 choppy wave simulation의 마지막 frame을 glTF 2.0
+scene으로 저장합니다.
+
+
+1. 무엇을 만드는가
+------------------
+
+출력은 embedded `.gltf` 파일 하나입니다.
+
+- water surface: triangle mesh primitive
+- water normal: vertex normal attribute
+- foam layer: point primitive
+- binary data: base64 data URI로 glTF 내부에 포함
+
+OBJ/PLY export는 파일을 역할별로 나누는 방식이고, glTF export는 final frame의
+표면과 foam point를 하나의 scene 파일로 묶는 방식입니다.
+
+
+2. 사용한 geometry
+------------------
+
+water surface:
+
+- `POSITION`: choppy displacement가 적용된 `(x, y, z)`
+- `NORMAL`: 중심 차분 tangent의 cross product로 계산한 vertex normal
+- `indices`: quad grid를 두 개의 triangle로 분할한 index buffer
+- primitive mode: `TRIANGLES`
+
+foam layer:
+
+- `POSITION`: steepness 기반 foam point 위치
+- `_STEEPNESS`: custom scalar attribute
+- primitive mode: `POINTS`
+
+
+3. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe export_spectral_choppy_gltf.py
+
+작은 smoke test:
+
+    .\.venv\Scripts\python.exe export_spectral_choppy_gltf.py --size 64 --steps 48 --frame-every 12 --max-surface-points 32 --foam-threshold 0.0 --max-foam-points 64 --output outputs\spectral_choppy_gltf_smoke.gltf
+
+고해상도 final frame export:
+
+    .\.venv\Scripts\python.exe export_spectral_choppy_gltf.py --size 512 --steps 720 --frame-every 24 --max-surface-points 256 --output outputs\spectral_choppy_wave_final.gltf
+
+
+4. 주요 옵션
+------------
+
+- `--size`: 내부 FFT simulation grid 크기
+- `--steps`: simulation step 수
+- `--frame-every`: frame 저장 간격
+- `--max-surface-points`: glTF로 내보낼 한 축 최대 surface point 수
+- `--choppiness`: 수평 displacement 강도
+- `--foam-threshold`: foam point로 내보낼 최소 steepness
+- `--max-foam-points`: 최대 foam point 수
+- `--foam-z-offset`: foam point를 수면 위로 올리는 z offset
+- `--output`: glTF 저장 경로
+
+
+5. 한계
+-------
+
+이 glTF는 final frame scene입니다.
+
+- animation clip은 아직 포함하지 않습니다.
+- foam은 point primitive이며 실제 유체 입자 simulation은 아닙니다.
+- embedded base64 방식이므로 큰 grid에서는 파일 크기가 빠르게 커집니다.
+
+
+6. 다음 개발 방향
+-----------------
+
+- glTF animation 또는 `.glb` binary export
+- Three.js/WebGPU viewer에서 glTF 직접 렌더링
+- foam point size/material을 viewer 쪽에서 제어
+- wave breaking과 spray를 더 물리적인 모델로 분리
