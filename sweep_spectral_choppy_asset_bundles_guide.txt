@@ -1,0 +1,73 @@
+sweep_spectral_choppy_asset_bundles.py 가이드
+============================================
+
+이 스크립트는 여러 parameter 값으로 spectral choppy wave asset bundle을 자동 생성하고,
+bundle comparison Markdown까지 만듭니다.
+
+
+1. 무엇을 하는가
+----------------
+
+현재 sweep 대상:
+
+- `choppiness`: 수평 displacement 강도
+- `foam_threshold`: foam point로 분류할 steepness 기준
+
+각 run은 독립 asset bundle 디렉터리를 만들고, run별 `bundle_report.md`를 생성합니다.
+마지막에는 모든 run을 모아 `bundle_comparison.md`를 생성합니다.
+
+
+2. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe sweep_spectral_choppy_asset_bundles.py
+
+choppiness sweep:
+
+    .\.venv\Scripts\python.exe sweep_spectral_choppy_asset_bundles.py --parameter choppiness --values "0.45,0.75,1.05"
+
+foam threshold sweep:
+
+    .\.venv\Scripts\python.exe sweep_spectral_choppy_asset_bundles.py --parameter foam_threshold --values "0.0,0.012,0.024"
+
+작은 smoke test:
+
+    .\.venv\Scripts\python.exe sweep_spectral_choppy_asset_bundles.py --size 64 --steps 48 --frame-every 12 --max-surface-points 32 --max-foam-points 64 --values "0.45,0.75" --output-dir outputs\spectral_choppy_asset_bundle_sweep_smoke
+
+
+3. 출력
+-------
+
+기본 출력 폴더:
+
+    outputs\spectral_choppy_asset_bundle_sweep
+
+주요 산출물:
+
+- `00_<parameter>_<value>/`: 첫 번째 asset bundle
+- `01_<parameter>_<value>/`: 두 번째 asset bundle
+- 각 run의 `bundle_manifest.json`
+- 각 run의 `bundle_report.md`
+- `bundle_comparison.md`
+- `sweep_manifest.json`
+
+
+4. 언제 쓰는가
+--------------
+
+- choppiness 변화가 geometry 크기와 foam point에 미치는 영향 확인
+- foam threshold가 point cloud 수에 미치는 영향 확인
+- 고해상도 export 전에 작은 grid로 parameter 후보를 좁힐 때
+- 여러 run을 GitHub에 기록하기 전 비교표로 정리할 때
+
+
+5. 한계
+-------
+
+이 sweep은 asset 규모와 export 산출물을 비교합니다.
+
+- 물리 정확성 검증은 하지 않습니다.
+- glTF/GLB animation clip은 아직 만들지 않습니다.
+- 모든 format을 생성하므로 큰 sweep은 디스크 사용량이 빠르게 늘어납니다.

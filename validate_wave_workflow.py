@@ -34,6 +34,7 @@ from shallow_water_streamline_viewer import build_streamline_figure, trace_strea
 from shallow_water_velocity_viewer import build_velocity_figure
 from spectral_choppy_wave_viewer import build_choppy_figure, simulate_choppy_frames
 from spectral_wave_surface_3d import simulate_spectral_wave
+from sweep_spectral_choppy_asset_bundles import run_asset_bundle_sweep
 from sweep_wave_experiments import parse_float_list, run_sweep
 from wave_dataset import load_wave_dataset, load_wave_dataset_with_velocity, save_wave_dataset
 
@@ -556,6 +557,37 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("Spectral Choppy Wave Asset Bundle Comparison" in choppy_bundle_comparison_text, "Choppy asset bundle comparison title missing.")
     assert_condition("GLB Seq Frames" in choppy_bundle_comparison_text, "Choppy asset bundle comparison GLB sequence column missing.")
     assert_condition("workflow_validation_spectral_choppy_asset_bundle" in choppy_bundle_comparison_text, "Choppy asset bundle comparison row missing.")
+    choppy_bundle_sweep = run_asset_bundle_sweep(
+        argparse.Namespace(
+            parameter="choppiness",
+            values=[0.45, 0.75],
+            size=32,
+            steps=24,
+            frame_every=6,
+            domain_size=8.0,
+            gravity=9.81,
+            dt=0.04,
+            wave_amplitude=0.06,
+            peak_wavelength=1.2,
+            bandwidth=0.32,
+            wind_direction_degrees=25.0,
+            directional_spread=6.0,
+            damping=0.9995,
+            seed=23,
+            choppiness=0.7,
+            max_surface_points=32,
+            foam_threshold=0.0,
+            max_foam_points=64,
+            foam_z_offset=0.01,
+            output_dir=output_dir / "workflow_validation_spectral_choppy_asset_bundle_sweep",
+        ),
+        device,
+    )
+    choppy_bundle_sweep_comparison = Path(choppy_bundle_sweep["outputs"]["comparison"])
+    choppy_bundle_sweep_text = choppy_bundle_sweep_comparison.read_text(encoding="utf-8")
+    assert_condition(len(choppy_bundle_sweep["runs"]) == 2, "Choppy asset bundle sweep should create two runs.")
+    assert_condition("00_choppiness_0p45" in choppy_bundle_sweep_text, "Choppy asset bundle sweep first run missing.")
+    assert_condition("01_choppiness_0p75" in choppy_bundle_sweep_text, "Choppy asset bundle sweep second run missing.")
     print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")
 
     spectral_benchmark = benchmark_spectral_size(
