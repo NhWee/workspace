@@ -1,0 +1,61 @@
+compare_spectral_choppy_asset_bundles.py 가이드
+==============================================
+
+이 스크립트는 여러 `bundle_manifest.json` 또는 asset bundle 디렉터리를 읽어서
+Markdown 비교 표를 만듭니다.
+
+
+1. 무엇을 비교하는가
+--------------------
+
+비교 표에는 다음 항목이 포함됩니다.
+
+- bundle name
+- frame count
+- simulation grid size
+- steps, frame_every
+- max_surface_points
+- choppiness
+- foam_threshold
+- total asset size
+- final GLB size
+- final GLB vertex/triangle/foam point count
+- GLB sequence frame count
+- missing asset count
+
+
+2. 실행 방법
+------------
+
+bundle 하나만 요약 표로 보기:
+
+    .\.venv\Scripts\python.exe compare_spectral_choppy_asset_bundles.py outputs\spectral_choppy_asset_bundle
+
+여러 bundle 비교:
+
+    .\.venv\Scripts\python.exe compare_spectral_choppy_asset_bundles.py outputs\bundle_a outputs\bundle_b --output outputs\bundle_comparison.md
+
+manifest 파일을 직접 지정:
+
+    .\.venv\Scripts\python.exe compare_spectral_choppy_asset_bundles.py outputs\bundle_a\bundle_manifest.json outputs\bundle_b\bundle_manifest.json
+
+
+3. 출력
+-------
+
+기본 출력 파일:
+
+    outputs\spectral_choppy_asset_bundle_comparison.md
+
+이 파일은 parameter sweep 또는 여러 해상도 실험의 결과 크기와 geometry 규모를
+빠르게 비교하는 데 사용합니다.
+
+
+4. 한계
+-------
+
+이 비교는 asset 규모와 manifest 정보를 비교합니다.
+
+- 실제 렌더링 품질을 비교하지 않습니다.
+- 물리 모델 정확도를 비교하지 않습니다.
+- frame별 geometry 차이는 계산하지 않습니다.

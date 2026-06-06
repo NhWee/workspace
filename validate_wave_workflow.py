@@ -15,6 +15,7 @@ from compare_wave_datasets import (
     save_frame_metric_series,
     write_summary,
 )
+from compare_spectral_choppy_asset_bundles import write_comparison as write_asset_bundle_comparison
 from export_spectral_choppy_asset_bundle import write_asset_bundle
 from export_spectral_choppy_mesh import (
     write_foam_ply,
@@ -549,6 +550,12 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("final GLB" in choppy_bundle_report_text, "Choppy asset bundle report final GLB row missing.")
     assert_condition("GLB sequence" in choppy_bundle_report_text, "Choppy asset bundle report GLB sequence row missing.")
     assert_condition("missing_assets: `0`" in choppy_bundle_report_text, "Choppy asset bundle report found missing assets.")
+    choppy_bundle_comparison_path = output_dir / "workflow_validation_spectral_choppy_asset_bundle_comparison.md"
+    write_asset_bundle_comparison([choppy_bundle_dir], choppy_bundle_comparison_path)
+    choppy_bundle_comparison_text = choppy_bundle_comparison_path.read_text(encoding="utf-8")
+    assert_condition("Spectral Choppy Wave Asset Bundle Comparison" in choppy_bundle_comparison_text, "Choppy asset bundle comparison title missing.")
+    assert_condition("GLB Seq Frames" in choppy_bundle_comparison_text, "Choppy asset bundle comparison GLB sequence column missing.")
+    assert_condition("workflow_validation_spectral_choppy_asset_bundle" in choppy_bundle_comparison_text, "Choppy asset bundle comparison row missing.")
     print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")
 
     spectral_benchmark = benchmark_spectral_size(
