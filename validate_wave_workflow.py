@@ -44,6 +44,7 @@ from spectral_choppy_wave_viewer import build_choppy_figure, simulate_choppy_fra
 from spectral_wave_surface_3d import simulate_spectral_wave
 from sweep_spectral_choppy_asset_bundles import run_asset_bundle_sweep
 from sweep_wave_experiments import parse_float_list, run_sweep
+from validate_spectral_choppy_asset_bundle import validate_bundle, write_validation_outputs
 from wave_dataset import load_wave_dataset, load_wave_dataset_with_velocity, save_wave_dataset
 
 
@@ -597,6 +598,11 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("GLB sequence" in choppy_bundle_report_text, "Choppy asset bundle report GLB sequence row missing.")
     assert_condition("animated GLB" in choppy_bundle_report_text, "Choppy asset bundle report animated GLB row missing.")
     assert_condition("missing_assets: `0`" in choppy_bundle_report_text, "Choppy asset bundle report found missing assets.")
+    choppy_bundle_validation = validate_bundle(choppy_bundle_dir)
+    choppy_bundle_validation_outputs = write_validation_outputs(choppy_bundle_validation, choppy_bundle_dir)
+    choppy_bundle_validation_text = Path(choppy_bundle_validation_outputs["report"]).read_text(encoding="utf-8")
+    assert_condition(choppy_bundle_validation["passed"], "Choppy asset bundle validation failed.")
+    assert_condition("animated GLB weight animation" in choppy_bundle_validation_text, "Choppy asset bundle validation animated GLB check missing.")
     choppy_bundle_comparison_path = output_dir / "workflow_validation_spectral_choppy_asset_bundle_comparison.md"
     write_asset_bundle_comparison([choppy_bundle_dir], choppy_bundle_comparison_path)
     choppy_bundle_comparison_text = choppy_bundle_comparison_path.read_text(encoding="utf-8")

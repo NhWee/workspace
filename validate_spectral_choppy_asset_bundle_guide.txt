@@ -1,0 +1,62 @@
+validate_spectral_choppy_asset_bundle.py 가이드
+==============================================
+
+이 스크립트는 spectral choppy wave asset bundle을 검사합니다.
+목적은 파일이 생성됐는지만 보는 것이 아니라, glTF/GLB 내부 구조와 animated morph target animation까지 확인하는 것입니다.
+
+
+1. 무엇을 검증하는가
+--------------------
+
+검증 항목:
+
+- `bundle_manifest.json` 존재 여부
+- manifest의 bundle marker와 frame count
+- viewer, OBJ, PLY, glTF, GLB, sequence, animated glTF/GLB 파일 존재 여부
+- metric CSV/JSON/Markdown 존재 여부
+- final glTF 2.0 버전과 water/foam primitive 구조
+- final GLB header와 JSON chunk 파싱
+- animated glTF/GLB의 weight animation channel
+- animated glTF/GLB의 morph target count가 `frame_count - 1`인지 확인
+
+
+2. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe validate_spectral_choppy_asset_bundle.py --bundle-dir outputs\spectral_choppy_asset_bundle
+
+검증 결과를 별도 폴더에 저장:
+
+    .\.venv\Scripts\python.exe validate_spectral_choppy_asset_bundle.py --bundle-dir outputs\spectral_choppy_asset_bundle --output-dir outputs\spectral_choppy_asset_bundle_validation
+
+
+3. 출력
+-------
+
+기본 출력:
+
+- `bundle_validation.json`
+- `bundle_validation.md`
+
+모든 check가 통과하면 exit code 0입니다. 실패 check가 있으면 exit code 1로 종료합니다.
+
+
+4. 언제 쓰는가
+--------------
+
+- asset bundle export 직후
+- GitHub에 run 결과를 기록하기 전
+- Blender, Three.js, 다른 glTF viewer로 넘기기 전
+- parameter sweep에서 특정 후보 bundle만 자세히 확인할 때
+
+
+5. 한계
+-------
+
+이 검증은 파일 구조와 glTF/GLB 구조를 확인합니다.
+
+- 실제 렌더링 이미지를 비교하지 않습니다.
+- 외부 3D 툴의 import 결과를 직접 확인하지 않습니다.
+- 물리 모델의 정확성은 평가하지 않습니다.
