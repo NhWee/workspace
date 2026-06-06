@@ -34,6 +34,7 @@ from export_spectral_choppy_gltf import (
     write_gltf_sequence,
 )
 from report_spectral_choppy_asset_bundle import write_report as write_asset_bundle_report
+from recommend_spectral_choppy_asset_bundle import recommend_bundles, write_recommendation
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
@@ -619,6 +620,13 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("Steepness P95 Max" in choppy_bundle_comparison_text, "Choppy asset bundle comparison metric column missing.")
     assert_condition("Fold Ratio Max" in choppy_bundle_comparison_text, "Choppy asset bundle comparison fold metric column missing.")
     assert_condition("workflow_validation_spectral_choppy_asset_bundle" in choppy_bundle_comparison_text, "Choppy asset bundle comparison row missing.")
+    choppy_bundle_recommendation_path = write_recommendation(
+        recommend_bundles([choppy_bundle_dir], argparse.Namespace(max_fold_ratio=0.0, max_displacement_p95=0.35, min_foam_ratio=0.0, max_foam_ratio=1.0)),
+        output_dir / "workflow_validation_spectral_choppy_asset_bundle_recommendation.md",
+    )
+    choppy_bundle_recommendation_text = choppy_bundle_recommendation_path.read_text(encoding="utf-8")
+    assert_condition("Spectral Choppy Wave Asset Bundle Recommendation" in choppy_bundle_recommendation_text, "Choppy asset bundle recommendation title missing.")
+    assert_condition("selected_bundle" in choppy_bundle_recommendation_text, "Choppy asset bundle recommendation selection missing.")
     choppy_bundle_sweep = run_asset_bundle_sweep(
         argparse.Namespace(
             parameter="choppiness",
@@ -641,18 +649,25 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
             foam_threshold=0.0,
             max_foam_points=64,
             foam_z_offset=0.01,
+            max_fold_ratio=0.0,
+            max_displacement_p95=0.35,
+            min_foam_ratio=0.0,
+            max_foam_ratio=1.0,
             output_dir=output_dir / "workflow_validation_spectral_choppy_asset_bundle_sweep",
         ),
         device,
     )
     choppy_bundle_sweep_comparison = Path(choppy_bundle_sweep["outputs"]["comparison"])
+    choppy_bundle_sweep_recommendation = Path(choppy_bundle_sweep["outputs"]["recommendation"])
     choppy_bundle_sweep_text = choppy_bundle_sweep_comparison.read_text(encoding="utf-8")
+    choppy_bundle_sweep_recommendation_text = choppy_bundle_sweep_recommendation.read_text(encoding="utf-8")
     assert_condition(len(choppy_bundle_sweep["runs"]) == 2, "Choppy asset bundle sweep should create two runs.")
     assert_condition("00_choppiness_0p45" in choppy_bundle_sweep_text, "Choppy asset bundle sweep first run missing.")
     assert_condition("01_choppiness_0p75" in choppy_bundle_sweep_text, "Choppy asset bundle sweep second run missing.")
     assert_condition("Animated GLB Size" in choppy_bundle_sweep_text, "Choppy asset bundle sweep comparison animated GLB column missing.")
     assert_condition("Steepness P95 Max" in choppy_bundle_sweep_text, "Choppy asset bundle sweep comparison metric column missing.")
     assert_condition("Fold Ratio Max" in choppy_bundle_sweep_text, "Choppy asset bundle sweep comparison fold metric column missing.")
+    assert_condition("selected_bundle" in choppy_bundle_sweep_recommendation_text, "Choppy asset bundle sweep recommendation selection missing.")
     assert_condition("metrics" in choppy_bundle_sweep["runs"][0], "Choppy asset bundle sweep run metrics missing.")
     print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")
 

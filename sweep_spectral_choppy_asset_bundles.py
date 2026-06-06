@@ -6,6 +6,7 @@ import torch
 
 from compare_spectral_choppy_asset_bundles import write_comparison
 from export_spectral_choppy_asset_bundle import export_choppy_asset_bundle
+from recommend_spectral_choppy_asset_bundle import recommend_bundles, write_recommendation
 from report_spectral_choppy_asset_bundle import write_report
 
 
@@ -74,6 +75,8 @@ def run_asset_bundle_sweep(args: argparse.Namespace, device: torch.device) -> di
 
     comparison_path = args.output_dir / "bundle_comparison.md"
     write_comparison(manifests, comparison_path)
+    recommendation = recommend_bundles(manifests, args)
+    recommendation_path = write_recommendation(recommendation, args.output_dir / "bundle_recommendation.md")
     sweep_manifest = {
         "sweep": "spectral_choppy_asset_bundle_sweep",
         "sweep_parameter": args.parameter,
@@ -82,6 +85,8 @@ def run_asset_bundle_sweep(args: argparse.Namespace, device: torch.device) -> di
         "runs": runs,
         "outputs": {
             "comparison": str(comparison_path),
+            "recommendation": str(recommendation_path),
+            "recommendation_json": str(recommendation_path.with_suffix(".json")),
         },
     }
     sweep_manifest_path = args.output_dir / "sweep_manifest.json"
@@ -112,6 +117,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--foam-threshold", type=float, default=0.018, help="Base minimum eta steepness for exported foam points.")
     parser.add_argument("--max-foam-points", type=int, default=300, help="Maximum exported foam points per frame.")
     parser.add_argument("--foam-z-offset", type=float, default=0.01, help="Vertical offset applied to exported foam points.")
+    parser.add_argument("--max-fold-ratio", type=float, default=0.0, help="Recommendation rejection threshold for folded triangle ratio.")
+    parser.add_argument("--max-displacement-p95", type=float, default=0.35, help="Recommendation rejection threshold for p95 horizontal displacement.")
+    parser.add_argument("--min-foam-ratio", type=float, default=0.0, help="Recommendation rejection threshold for minimum mean foam ratio.")
+    parser.add_argument("--max-foam-ratio", type=float, default=1.0, help="Recommendation rejection threshold for maximum mean foam ratio.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/spectral_choppy_asset_bundle_sweep"), help="Sweep output directory.")
     return parser.parse_args()
 
@@ -125,6 +134,7 @@ def main() -> None:
     manifest = run_asset_bundle_sweep(args, device)
     print(f"Runs: {len(manifest['runs'])}")
     print(f"Comparison: {manifest['outputs']['comparison']}")
+    print(f"Recommendation: {manifest['outputs']['recommendation']}")
 
 
 if __name__ == "__main__":

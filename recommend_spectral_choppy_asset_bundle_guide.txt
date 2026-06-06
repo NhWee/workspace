@@ -1,0 +1,66 @@
+recommend_spectral_choppy_asset_bundle.py 가이드
+===============================================
+
+이 스크립트는 여러 spectral choppy wave asset bundle 중 다음 고해상도 export 후보를 추천합니다.
+단순히 가장 강한 파도를 고르는 것이 아니라, fold ratio와 displacement 기준으로 위험한 후보를 먼저 제외합니다.
+
+
+1. 무엇을 기준으로 고르는가
+--------------------------
+
+reject 기준:
+
+- `folded_triangle_ratio_max > --max-fold-ratio`
+- `horizontal_displacement_p95_max > --max-displacement-p95`
+- `foam_ratio_mean < --min-foam-ratio`
+- `foam_ratio_mean > --max-foam-ratio`
+
+score 기준:
+
+- `steepness_p95_max`: 큰 값 선호
+- `eta_range_max`: 큰 값 선호
+- `horizontal_displacement_p95_max`: 작은 값 선호
+- `folded_triangle_ratio_max`: 작은 값 선호
+
+
+2. 실행 방법
+------------
+
+sweep manifest에서 추천:
+
+    .\.venv\Scripts\python.exe recommend_spectral_choppy_asset_bundle.py --sweep-manifest outputs\spectral_choppy_asset_bundle_sweep\sweep_manifest.json
+
+bundle을 직접 지정:
+
+    .\.venv\Scripts\python.exe recommend_spectral_choppy_asset_bundle.py outputs\bundle_a outputs\bundle_b --output outputs\bundle_recommendation.md
+
+fold가 조금이라도 있으면 reject:
+
+    .\.venv\Scripts\python.exe recommend_spectral_choppy_asset_bundle.py --sweep-manifest outputs\spectral_choppy_asset_bundle_sweep\sweep_manifest.json --max-fold-ratio 0.0
+
+
+3. 출력
+-------
+
+- Markdown report: `spectral_choppy_asset_bundle_recommendation.md`
+- JSON report: Markdown 파일과 같은 이름의 `.json`
+
+추천 report에는 선택된 bundle, 점수, reject 여부, 후보별 metric 표가 들어갑니다.
+
+
+4. 언제 쓰는가
+--------------
+
+- choppiness sweep 후 안전한 후보를 고를 때
+- foam threshold sweep 후 foam 과밀/부족 후보를 걸러낼 때
+- 512 이상 고해상도 export 전에 작은 grid 결과로 후보를 좁힐 때
+
+
+5. 한계
+-------
+
+이 추천은 현재 metric 기반 heuristic입니다.
+
+- 실제 렌더링 품질을 직접 판정하지 않습니다.
+- 물리 모델 정확도를 보장하지 않습니다.
+- 사용 목적에 따라 threshold는 조정해야 합니다.
