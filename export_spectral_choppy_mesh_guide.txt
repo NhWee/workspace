@@ -1,0 +1,91 @@
+export_spectral_choppy_mesh.py 가이드
+====================================
+
+이 스크립트는 GPU FFT 기반 choppy wave simulation의 마지막 frame을 OBJ mesh로
+내보냅니다.
+
+
+1. 무엇을 만드는가
+------------------
+
+출력은 두 가지입니다.
+
+- OBJ 파일: 3D 수면 표면 mesh
+- JSON metadata 파일: simulation parameter, device, vertex/face count 기록
+
+OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
+
+- 각 격자점은 `v x y z` vertex가 됩니다.
+- 인접한 네 점은 `f v00 v01 v11 v10` quad face가 됩니다.
+- `x, y`는 choppiness 때문에 원래 정사각 격자에서 수평으로 밀립니다.
+- `z`는 FFT spectral wave의 수면 변위 `eta`입니다.
+
+
+2. 사용한 계산
+--------------
+
+기본 수면 계산은 `spectral_choppy_wave_viewer.py`의 `simulate_choppy_frames()`를
+재사용합니다.
+
+핵심은 다음과 같습니다.
+
+- 초기 주파수 spectrum을 만듭니다.
+- 분산 관계 `omega = sqrt(g * |k|)`로 각 wave number의 진행 속도를 정합니다.
+- 시간 `t`에서 `exp(i * omega * t)` phase를 곱합니다.
+- inverse FFT로 수면 높이 `eta(x, y, t)`를 얻습니다.
+- `kx / |k|`, `ky / |k|` 방향 성분으로 수평 displacement를 계산합니다.
+- 마지막 저장 frame의 `(x, y, z)` grid를 OBJ로 변환합니다.
+
+
+3. 실행 방법
+------------
+
+기본 실행:
+
+    .\.venv\Scripts\python.exe export_spectral_choppy_mesh.py
+
+작은 smoke test:
+
+    .\.venv\Scripts\python.exe export_spectral_choppy_mesh.py --size 64 --steps 48 --frame-every 12 --max-mesh-points 32 --output outputs\spectral_choppy_mesh_smoke.obj
+
+고해상도 export 예:
+
+    .\.venv\Scripts\python.exe export_spectral_choppy_mesh.py --size 512 --steps 720 --frame-every 24 --max-mesh-points 256 --output outputs\spectral_choppy_wave_256.obj
+
+
+4. 주요 옵션
+------------
+
+- `--size`: 내부 FFT simulation grid 크기
+- `--steps`: simulation step 수
+- `--frame-every`: frame 저장 간격
+- `--domain-size`: 물리 domain 폭
+- `--wave-amplitude`: 수면 변위 크기
+- `--peak-wavelength`: 주요 파장
+- `--wind-direction-degrees`: 주요 진행 방향
+- `--directional-spread`: 방향성 집중도
+- `--choppiness`: 수평 displacement 강도
+- `--max-mesh-points`: OBJ로 내보낼 한 축 최대 점 수
+- `--output`: OBJ 저장 경로
+- `--metadata-output`: JSON metadata 저장 경로
+
+
+5. 한계
+-------
+
+이 mesh는 현재 시점의 수면 표면만 저장합니다.
+
+- volume fluid simulation은 아닙니다.
+- breaking wave, splash, spray를 직접 계산하지 않습니다.
+- OBJ는 animation을 담지 않으므로 한 frame의 geometry만 저장합니다.
+- 큰 `max-mesh-points`는 OBJ 파일을 빠르게 크게 만듭니다.
+
+
+6. 다음 개발 방향
+-----------------
+
+- 여러 frame을 연속 OBJ 또는 Alembic/USD 계열로 export
+- vertex normal 계산 추가
+- foam mask를 별도 point cloud 또는 vertex color 데이터로 저장
+- Three.js/WebGPU viewer에서 mesh를 직접 렌더링
+- 더 물리적인 wave breaking/foam 모델 추가

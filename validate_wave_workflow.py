@@ -14,6 +14,7 @@ from compare_wave_datasets import (
     save_frame_metric_series,
     write_summary,
 )
+from export_spectral_choppy_mesh import write_metadata, write_obj_mesh
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
@@ -380,6 +381,30 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("Plotly.newPlot" in choppy_html_text, "Choppy HTML is missing Plotly.newPlot.")
     assert_condition("foam highlights" in choppy_html_text, "Choppy HTML is missing foam highlights trace.")
     print(f"Validated spectral choppy wave viewer: {choppy_html_path}")
+
+    choppy_mesh_path = output_dir / "workflow_validation_spectral_choppy_mesh.obj"
+    choppy_mesh_summary = write_obj_mesh(choppy_mesh_path, choppy_x, choppy_y, choppy_z)
+    choppy_metadata_path = output_dir / "workflow_validation_spectral_choppy_mesh.json"
+    write_metadata(
+        choppy_metadata_path,
+        choppy_mesh_summary,
+        {
+            "size": max(32, size // 2),
+            "steps": max(24, steps // 3),
+            "frame_every": max(6, frame_every // 2),
+            "domain_size": 8.0,
+            "choppiness": 0.7,
+        },
+        device,
+    )
+    choppy_mesh_text = choppy_mesh_path.read_text(encoding="utf-8")
+    choppy_metadata_text = choppy_metadata_path.read_text(encoding="utf-8")
+    assert_condition("\nv " in choppy_mesh_text, "Choppy OBJ mesh is missing vertices.")
+    assert_condition("\nf " in choppy_mesh_text, "Choppy OBJ mesh is missing faces.")
+    assert_condition("spectral_choppy_mesh" in choppy_metadata_text, "Choppy mesh metadata solver marker missing.")
+    assert_condition(choppy_mesh_summary["vertex_count"] > 0, "Choppy OBJ mesh has no vertices.")
+    assert_condition(choppy_mesh_summary["quad_face_count"] > 0, "Choppy OBJ mesh has no faces.")
+    print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")
 
     spectral_benchmark = benchmark_spectral_size(
         size=max(32, size // 2),
