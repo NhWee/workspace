@@ -187,8 +187,48 @@ def write_gltf_scene(
     }
 
 
+def write_gltf_sequence(
+    output_dir: Path,
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    foam_threshold: float,
+    max_foam_points: int,
+    foam_z_offset: float,
+) -> dict:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    frame_summaries = []
+    for index, (x_grid, y_grid, z_grid) in enumerate(frames):
+        frame_path = output_dir / f"frame_{index:04d}.gltf"
+        frame_summaries.append(
+            write_gltf_scene(
+                frame_path,
+                x_grid,
+                y_grid,
+                z_grid,
+                foam_threshold=foam_threshold,
+                max_foam_points=max_foam_points,
+                foam_z_offset=foam_z_offset,
+            )
+        )
+
+    manifest = {
+        "exporter": "export_spectral_choppy_gltf.py",
+        "format": "embedded_gltf_sequence",
+        "frame_count": len(frame_summaries),
+        "frames": frame_summaries,
+    }
+    manifest_path = output_dir / "sequence_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return {
+        "directory": str(output_dir),
+        "manifest_path": str(manifest_path),
+        "frame_count": len(frame_summaries),
+        "frames": frame_summaries,
+    }
+
+
 def export_final_choppy_gltf(
     output: Path,
+    sequence_output_dir: Path | None,
     size: int,
     steps: int,
     frame_every: int,
@@ -231,7 +271,7 @@ def export_final_choppy_gltf(
         raise RuntimeError("No choppy wave frames were produced.")
 
     x_grid, y_grid, z_grid = frames[-1]
-    return write_gltf_scene(
+    final_summary = write_gltf_scene(
         output,
         x_grid,
         y_grid,
@@ -240,6 +280,18 @@ def export_final_choppy_gltf(
         max_foam_points=max_foam_points,
         foam_z_offset=foam_z_offset,
     )
+    sequence_summary = (
+        write_gltf_sequence(
+            sequence_output_dir,
+            frames,
+            foam_threshold=foam_threshold,
+            max_foam_points=max_foam_points,
+            foam_z_offset=foam_z_offset,
+        )
+        if sequence_output_dir is not None
+        else None
+    )
+    return {"final": final_summary, "sequence": sequence_summary}
 
 
 def parse_args() -> argparse.Namespace:
@@ -263,6 +315,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-foam-points", type=int, default=900, help="Maximum exported foam points.")
     parser.add_argument("--foam-z-offset", type=float, default=0.01, help="Vertical offset applied to exported foam points.")
     parser.add_argument("--output", type=Path, default=Path("outputs/spectral_choppy_wave_final.gltf"), help="Output glTF path.")
+    parser.add_argument("--sequence-output-dir", type=Path, default=None, help="Optional directory for glTF files for every saved frame.")
     return parser.parse_args()
 
 
@@ -275,6 +328,7 @@ def main() -> None:
 
     summary = export_final_choppy_gltf(
         output=args.output,
+        sequence_output_dir=args.sequence_output_dir,
         size=args.size,
         steps=args.steps,
         frame_every=args.frame_every,
@@ -295,10 +349,14 @@ def main() -> None:
         foam_z_offset=args.foam_z_offset,
         device=device,
     )
-    print(f"Saved glTF: {summary['path']}")
-    print(f"Vertices: {summary['vertex_count']}")
-    print(f"Triangles: {summary['triangle_count']}")
-    print(f"Foam points: {summary['foam_point_count']}")
+    print(f"Saved glTF: {summary['final']['path']}")
+    print(f"Vertices: {summary['final']['vertex_count']}")
+    print(f"Triangles: {summary['final']['triangle_count']}")
+    print(f"Foam points: {summary['final']['foam_point_count']}")
+    if summary["sequence"] is not None:
+        print(f"Saved glTF sequence: {summary['sequence']['directory']}")
+        print(f"Sequence frames: {summary['sequence']['frame_count']}")
+        print(f"Saved sequence manifest: {summary['sequence']['manifest_path']}")
 
 
 if __name__ == "__main__":
