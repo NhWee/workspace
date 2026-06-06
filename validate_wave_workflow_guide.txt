@@ -38,7 +38,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 23. spectral choppy wave height/steepness/foam/displacement/fold metric 확인
 24. spectral choppy wave OBJ mesh/sequence, foam PLY/sequence, glTF/GLB scene/sequence, animated glTF/GLB export 확인
 25. spectral choppy wave 통합 asset bundle export, animated asset, metric 산출물, Markdown report 확인
-26. spectral choppy wave asset bundle validation, recommendation, bundle comparison 확인
+26. spectral choppy wave asset bundle validation, recommendation, production export plan, bundle comparison 확인
 27. spectral choppy wave asset bundle sweep과 sweep recommendation 확인
 28. spectral wave benchmark metric/chart 확인
 29. bathymetry/spectral solver benchmark comparison 확인
@@ -92,6 +92,8 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - workflow_validation_spectral_choppy_asset_bundle/bundle_validation.json
 - workflow_validation_spectral_choppy_asset_bundle_comparison.md
 - workflow_validation_spectral_choppy_asset_bundle_recommendation.md
+- workflow_validation_spectral_choppy_production_export_plan.md
+- workflow_validation_spectral_choppy_production_export_plan.json
 - workflow_validation_spectral_choppy_asset_bundle_sweep/
 - workflow_validation_spectral_benchmark.html
 - workflow_validation_solver_benchmark/
@@ -126,7 +128,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - spectral choppy wave metric CSV/JSON/Markdown 생성 성공, fold metric 확인 성공
 - spectral choppy wave OBJ mesh/sequence, foam PLY/sequence, glTF/GLB scene/sequence, animated glTF/GLB export 확인 성공
 - spectral choppy wave 통합 asset bundle export, animated asset, metric 산출물, Markdown report 확인 성공
-- spectral choppy wave asset bundle validation, recommendation, bundle comparison 확인 성공
+- spectral choppy wave asset bundle validation, recommendation, production export plan, bundle comparison 확인 성공
 - spectral choppy wave asset bundle sweep과 sweep recommendation 확인 성공
 - spectral wave benchmark metric/chart 확인 성공
 - solver benchmark comparison CSV/HTML 생성 성공

@@ -1,0 +1,63 @@
+plan_spectral_choppy_production_export.py 가이드
+===============================================
+
+이 스크립트는 추천된 spectral choppy wave asset bundle에서 production export 명령을 생성합니다.
+작은 grid sweep으로 고른 후보의 `choppiness`, `foam_threshold`, spectrum parameter를 유지하고,
+해상도와 frame 수만 production 값으로 올리는 것이 목적입니다.
+
+
+1. 무엇을 만드는가
+------------------
+
+출력:
+
+- Markdown export plan
+- JSON export plan
+
+plan에는 다음이 들어갑니다.
+
+- 선택된 source manifest
+- production output directory
+- `export_spectral_choppy_asset_bundle.py` 명령
+- `validate_spectral_choppy_asset_bundle.py` 명령
+- 최종 production parameter 표
+
+
+2. 실행 방법
+------------
+
+recommendation JSON에서 생성:
+
+    .\.venv\Scripts\python.exe plan_spectral_choppy_production_export.py --recommendation-json outputs\spectral_choppy_asset_bundle_sweep\bundle_recommendation.json
+
+선택한 manifest를 직접 지정:
+
+    .\.venv\Scripts\python.exe plan_spectral_choppy_production_export.py --selected-manifest outputs\spectral_choppy_asset_bundle_sweep\00_choppiness_0p45\bundle_manifest.json
+
+512 grid production plan:
+
+    .\.venv\Scripts\python.exe plan_spectral_choppy_production_export.py --recommendation-json outputs\spectral_choppy_asset_bundle_sweep\bundle_recommendation.json --size 512 --steps 720 --frame-every 24 --max-surface-points 256 --production-output-dir outputs\spectral_choppy_asset_bundle_512
+
+
+3. 출력
+-------
+
+기본 출력:
+
+- `outputs/spectral_choppy_production_export_plan.md`
+- `outputs/spectral_choppy_production_export_plan.json`
+
+
+4. 언제 쓰는가
+--------------
+
+- 작은 sweep에서 안전한 후보를 고른 뒤
+- 고해상도 export 명령을 재조합하기 전
+- GitHub에 production parameter를 기록하고 싶을 때
+
+
+5. 한계
+-------
+
+이 스크립트는 plan을 생성하지만 production export를 직접 실행하지 않습니다.
+큰 export는 시간과 디스크 사용량이 커질 수 있으므로 명령을 확인한 뒤 실행하는 방식이 안전합니다.

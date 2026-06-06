@@ -35,6 +35,7 @@ from export_spectral_choppy_gltf import (
 )
 from report_spectral_choppy_asset_bundle import write_report as write_asset_bundle_report
 from recommend_spectral_choppy_asset_bundle import recommend_bundles, write_recommendation
+from plan_spectral_choppy_production_export import build_plan, write_plan
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
@@ -627,6 +628,22 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     choppy_bundle_recommendation_text = choppy_bundle_recommendation_path.read_text(encoding="utf-8")
     assert_condition("Spectral Choppy Wave Asset Bundle Recommendation" in choppy_bundle_recommendation_text, "Choppy asset bundle recommendation title missing.")
     assert_condition("selected_bundle" in choppy_bundle_recommendation_text, "Choppy asset bundle recommendation selection missing.")
+    choppy_production_plan_path = write_plan(
+        build_plan(
+            choppy_bundle_dir / "bundle_manifest.json",
+            output_dir=output_dir / "workflow_validation_spectral_choppy_asset_bundle_production",
+            size=128,
+            steps=96,
+            frame_every=12,
+            max_surface_points=64,
+            max_foam_points=128,
+        ),
+        output_dir / "workflow_validation_spectral_choppy_production_export_plan.md",
+    )
+    choppy_production_plan_text = choppy_production_plan_path.read_text(encoding="utf-8")
+    assert_condition("Spectral Choppy Wave Production Export Plan" in choppy_production_plan_text, "Choppy production export plan title missing.")
+    assert_condition("--size 128" in choppy_production_plan_text, "Choppy production export plan size missing.")
+    assert_condition("--max-surface-points 64" in choppy_production_plan_text, "Choppy production export plan surface point setting missing.")
     choppy_bundle_sweep = run_asset_bundle_sweep(
         argparse.Namespace(
             parameter="choppiness",
