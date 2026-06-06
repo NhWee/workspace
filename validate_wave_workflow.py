@@ -15,6 +15,7 @@ from compare_wave_datasets import (
     save_frame_metric_series,
     write_summary,
 )
+from export_spectral_choppy_asset_bundle import write_asset_bundle
 from export_spectral_choppy_mesh import (
     write_foam_ply,
     write_foam_sequence,
@@ -519,6 +520,28 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(choppy_glb_sequence_manifest["format"] == "glb_sequence", "Choppy GLB sequence manifest format mismatch.")
     assert_condition(choppy_glb_sequence_header[:4] == b"glTF", "Choppy GLB sequence first frame magic header mismatch.")
     assert_condition(int.from_bytes(choppy_glb_sequence_header[4:8], "little") == 2, "Choppy GLB sequence first frame version mismatch.")
+    choppy_bundle_dir = output_dir / "workflow_validation_spectral_choppy_asset_bundle"
+    choppy_bundle_manifest = write_asset_bundle(
+        choppy_bundle_dir,
+        choppy_frames,
+        domain_size=8.0,
+        simulation_parameters={
+            "size": max(32, size // 2),
+            "steps": max(24, steps // 3),
+            "frame_every": max(6, frame_every // 2),
+            "domain_size": 8.0,
+            "source": "workflow_validation",
+        },
+        device=device,
+        foam_threshold=0.0,
+        max_foam_points=64,
+        foam_z_offset=0.01,
+    )
+    assert_condition(choppy_bundle_manifest["frame_count"] == len(choppy_frames), "Choppy asset bundle frame count mismatch.")
+    assert_condition((choppy_bundle_dir / "bundle_manifest.json").exists(), "Choppy asset bundle manifest missing.")
+    assert_condition((choppy_bundle_dir / "viewer.html").exists(), "Choppy asset bundle viewer missing.")
+    assert_condition((choppy_bundle_dir / "final.glb").exists(), "Choppy asset bundle final GLB missing.")
+    assert_condition((choppy_bundle_dir / "glb_sequence" / "frame_0000.glb").exists(), "Choppy asset bundle GLB sequence missing.")
     print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")
 
     spectral_benchmark = benchmark_spectral_size(
