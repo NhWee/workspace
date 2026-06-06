@@ -8,6 +8,18 @@ import torch
 from spectral_choppy_wave_viewer import simulate_choppy_frames
 
 
+def compute_vertex_normals(x_grid: np.ndarray, y_grid: np.ndarray, z_grid: np.ndarray) -> np.ndarray:
+    positions = np.stack((x_grid, y_grid, z_grid), axis=-1)
+    tangent_y = np.gradient(positions, axis=0)
+    tangent_x = np.gradient(positions, axis=1)
+    normals = np.cross(tangent_x, tangent_y)
+    lengths = np.linalg.norm(normals, axis=-1, keepdims=True)
+    normals = normals / np.clip(lengths, 1.0e-12, None)
+    downward = normals[..., 2] < 0.0
+    normals[downward] *= -1.0
+    return normals
+
+
 def write_obj_mesh(path: Path, x_grid: np.ndarray, y_grid: np.ndarray, z_grid: np.ndarray) -> dict:
     if x_grid.shape != y_grid.shape or x_grid.shape != z_grid.shape:
         raise ValueError("x_grid, y_grid, and z_grid must have the same shape.")
@@ -16,16 +28,24 @@ def write_obj_mesh(path: Path, x_grid: np.ndarray, y_grid: np.ndarray, z_grid: n
 
     rows, cols = x_grid.shape
     vertex_count = rows * cols
+    normal_count = vertex_count
     face_count = max(0, rows - 1) * max(0, cols - 1)
+    normals = compute_vertex_normals(x_grid, y_grid, z_grid)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as obj_file:
         obj_file.write("# Spectral choppy wave final-frame mesh\n")
         obj_file.write(f"# vertices {vertex_count}\n")
+        obj_file.write(f"# vertex_normals {normal_count}\n")
         obj_file.write(f"# quad_faces {face_count}\n")
         for row in range(rows):
             for col in range(cols):
                 obj_file.write(f"v {x_grid[row, col]:.9g} {y_grid[row, col]:.9g} {z_grid[row, col]:.9g}\n")
+
+        for row in range(rows):
+            for col in range(cols):
+                nx, ny, nz = normals[row, col]
+                obj_file.write(f"vn {nx:.9g} {ny:.9g} {nz:.9g}\n")
 
         for row in range(rows - 1):
             for col in range(cols - 1):
@@ -33,13 +53,14 @@ def write_obj_mesh(path: Path, x_grid: np.ndarray, y_grid: np.ndarray, z_grid: n
                 v01 = v00 + 1
                 v10 = (row + 1) * cols + col + 1
                 v11 = v10 + 1
-                obj_file.write(f"f {v00} {v01} {v11} {v10}\n")
+                obj_file.write(f"f {v00}//{v00} {v01}//{v01} {v11}//{v11} {v10}//{v10}\n")
 
     return {
         "path": str(path),
         "rows": rows,
         "cols": cols,
         "vertex_count": vertex_count,
+        "normal_count": normal_count,
         "quad_face_count": face_count,
     }
 

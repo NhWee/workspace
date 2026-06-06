@@ -12,11 +12,12 @@ export_spectral_choppy_mesh.py 가이드
 
 - OBJ 파일: 마지막 3D 수면 표면 mesh
 - OBJ sequence directory: 선택 사항, 저장된 모든 frame의 mesh
-- JSON metadata 파일: simulation parameter, device, vertex/face count, sequence 정보 기록
+- JSON metadata 파일: simulation parameter, device, vertex/normal/face count, sequence 정보 기록
 
 OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
 
 - 각 격자점은 `v x y z` vertex가 됩니다.
+- 각 격자점의 조명 방향은 `vn nx ny nz` vertex normal이 됩니다.
 - 인접한 네 점은 `f v00 v01 v11 v10` quad face가 됩니다.
 - `x, y`는 choppiness 때문에 원래 정사각 격자에서 수평으로 밀립니다.
 - `z`는 FFT spectral wave의 수면 변위 `eta`입니다.
@@ -36,6 +37,7 @@ OBJ mesh는 height-field grid를 다음 구조로 저장합니다.
 - inverse FFT로 수면 높이 `eta(x, y, t)`를 얻습니다.
 - `kx / |k|`, `ky / |k|` 방향 성분으로 수평 displacement를 계산합니다.
 - 마지막 저장 frame의 `(x, y, z)` grid를 OBJ로 변환합니다.
+- 중심 차분으로 각 vertex의 tangent를 구하고 cross product로 normal을 계산합니다.
 - `--sequence-output-dir`를 지정하면 모든 저장 frame을 `frame_0000.obj`,
   `frame_0001.obj` 형식으로 변환합니다.
 
@@ -94,7 +96,6 @@ OBJ sequence export:
 -----------------
 
 - Alembic/USD 계열 animation export
-- vertex normal 계산 추가
 - foam mask를 별도 point cloud 또는 vertex color 데이터로 저장
 - Three.js/WebGPU viewer에서 mesh를 직접 렌더링
 - 더 물리적인 wave breaking/foam 모델 추가

@@ -405,12 +405,18 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     choppy_sequence_text = choppy_sequence_frame_path.read_text(encoding="utf-8")
     choppy_metadata_text = choppy_metadata_path.read_text(encoding="utf-8")
     assert_condition("\nv " in choppy_mesh_text, "Choppy OBJ mesh is missing vertices.")
+    assert_condition("\nvn " in choppy_mesh_text, "Choppy OBJ mesh is missing vertex normals.")
     assert_condition("\nf " in choppy_mesh_text, "Choppy OBJ mesh is missing faces.")
     assert_condition("\nv " in choppy_sequence_text, "Choppy OBJ sequence frame is missing vertices.")
+    assert_condition("\nvn " in choppy_sequence_text, "Choppy OBJ sequence frame is missing vertex normals.")
     assert_condition("\nf " in choppy_sequence_text, "Choppy OBJ sequence frame is missing faces.")
     assert_condition("spectral_choppy_mesh" in choppy_metadata_text, "Choppy mesh metadata solver marker missing.")
     assert_condition("\"sequence\"" in choppy_metadata_text, "Choppy mesh metadata sequence marker missing.")
     assert_condition(choppy_mesh_summary["vertex_count"] > 0, "Choppy OBJ mesh has no vertices.")
+    assert_condition(
+        choppy_mesh_summary["normal_count"] == choppy_mesh_summary["vertex_count"],
+        "Choppy OBJ mesh normal count mismatch.",
+    )
     assert_condition(choppy_mesh_summary["quad_face_count"] > 0, "Choppy OBJ mesh has no faces.")
     assert_condition(
         choppy_sequence_summary["frame_count"] == len(choppy_frames),
