@@ -4,7 +4,14 @@ from pathlib import Path
 
 import torch
 
-from export_spectral_choppy_gltf import write_glb_scene, write_glb_sequence, write_gltf_scene, write_gltf_sequence
+from export_spectral_choppy_gltf import (
+    write_animated_glb_scene,
+    write_animated_gltf_scene,
+    write_glb_scene,
+    write_glb_sequence,
+    write_gltf_scene,
+    write_gltf_sequence,
+)
 from export_spectral_choppy_mesh import write_foam_ply, write_foam_sequence, write_obj_mesh, write_obj_sequence
 from evaluate_spectral_choppy_wave import evaluate_choppy_frames, write_metric_outputs
 from spectral_choppy_wave_viewer import build_choppy_figure, simulate_choppy_frames
@@ -85,6 +92,17 @@ def write_asset_bundle(
         max_foam_points=max_foam_points,
         foam_z_offset=foam_z_offset,
     )
+    animation_frame_duration = simulation_parameters.get("frame_every", 1) * simulation_parameters.get("dt", 1.0)
+    animated_gltf_summary = write_animated_gltf_scene(
+        output_dir / "animated.gltf",
+        frames,
+        frame_duration=animation_frame_duration,
+    )
+    animated_glb_summary = write_animated_glb_scene(
+        output_dir / "animated.glb",
+        frames,
+        frame_duration=animation_frame_duration,
+    )
     metric_summary = write_metric_outputs(
         evaluate_choppy_frames(frames, domain_size, foam_threshold),
         output_dir,
@@ -104,6 +122,8 @@ def write_asset_bundle(
         "glb": glb_summary,
         "gltf_sequence": gltf_sequence_summary,
         "glb_sequence": glb_sequence_summary,
+        "animated_gltf": animated_gltf_summary,
+        "animated_glb": animated_glb_summary,
         "metrics": metric_summary,
     }
     manifest_path = output_dir / "bundle_manifest.json"

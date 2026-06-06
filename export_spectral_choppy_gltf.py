@@ -263,6 +263,160 @@ def write_glb_scene(
     return summary
 
 
+def build_glb_bytes(gltf: dict, buffer_data: bytes) -> bytes:
+    gltf_json = json.dumps(gltf, separators=(",", ":")).encode("utf-8")
+    json_chunk = pad_bytes(gltf_json, 4, b" ")
+    bin_chunk = pad_bytes(buffer_data, 4, b"\x00")
+    total_length = 12 + 8 + len(json_chunk) + 8 + len(bin_chunk)
+    return b"".join(
+        [
+            struct.pack("<III", GLB_MAGIC, GLB_VERSION, total_length),
+            struct.pack("<II", len(json_chunk), GLB_JSON_CHUNK),
+            json_chunk,
+            struct.pack("<II", len(bin_chunk), GLB_BIN_CHUNK),
+            bin_chunk,
+        ]
+    )
+
+
+def build_animated_gltf_document(
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    frame_duration: float,
+    embed_buffer: bool,
+) -> dict:
+    if len(frames) < 2:
+        raise RuntimeError("Animated glTF export requires at least two frames.")
+
+    x0, y0, z0 = frames[0]
+    if x0.shape != y0.shape or x0.shape != z0.shape:
+        raise ValueError("Frame grids must have matching shapes.")
+    if x0.ndim != 2:
+        raise ValueError("Animated glTF export expects 2D grid arrays.")
+
+    rows, cols = x0.shape
+    base_positions = np.stack((x0, y0, z0), axis=-1).reshape(-1, 3).astype(np.float32)
+    base_normals = compute_vertex_normals(x0, y0, z0).reshape(-1, 3).astype(np.float32)
+    indices = make_triangle_indices(rows, cols)
+
+    chunks: list[bytes] = []
+    buffer_views: list[dict] = []
+    accessors: list[dict] = []
+    position_accessor = append_buffer(chunks, buffer_views, accessors, base_positions, GL_FLOAT, "VEC3", GL_ARRAY_BUFFER)
+    normal_accessor = append_buffer(chunks, buffer_views, accessors, base_normals, GL_FLOAT, "VEC3", GL_ARRAY_BUFFER)
+    index_accessor = append_buffer(chunks, buffer_views, accessors, indices, GL_UNSIGNED_INT, "SCALAR", GL_ELEMENT_ARRAY_BUFFER)
+
+    targets = []
+    for frame_index, (x_grid, y_grid, z_grid) in enumerate(frames[1:], start=1):
+        if x_grid.shape != x0.shape or y_grid.shape != x0.shape or z_grid.shape != x0.shape:
+            raise ValueError(f"Frame {frame_index} shape does not match the first frame.")
+        positions = np.stack((x_grid, y_grid, z_grid), axis=-1).reshape(-1, 3).astype(np.float32)
+        delta_positions = positions - base_positions
+        delta_accessor = append_buffer(chunks, buffer_views, accessors, delta_positions, GL_FLOAT, "VEC3", GL_ARRAY_BUFFER)
+        targets.append({"POSITION": delta_accessor})
+
+    times = (np.arange(len(frames), dtype=np.float32) * np.float32(frame_duration)).reshape(-1)
+    target_count = len(targets)
+    weights = np.zeros((len(frames), target_count), dtype=np.float32)
+    for frame_index in range(1, len(frames)):
+        weights[frame_index, frame_index - 1] = 1.0
+    time_accessor = append_buffer(chunks, buffer_views, accessors, times, GL_FLOAT, "SCALAR", None)
+    weight_accessor = append_buffer(chunks, buffer_views, accessors, weights.reshape(-1), GL_FLOAT, "SCALAR", None)
+
+    buffer_data = b"".join(chunks)
+    buffer = {"byteLength": len(buffer_data)}
+    if embed_buffer:
+        buffer["uri"] = "data:application/octet-stream;base64," + base64.b64encode(buffer_data).decode("ascii")
+
+    gltf = {
+        "asset": {"version": "2.0", "generator": "export_spectral_choppy_gltf.py"},
+        "scene": 0,
+        "scenes": [{"nodes": [0]}],
+        "nodes": [{"mesh": 0, "name": "animated_spectral_choppy_wave", "weights": [0.0] * target_count}],
+        "meshes": [
+            {
+                "name": "animated_spectral_choppy_wave_surface",
+                "weights": [0.0] * target_count,
+                "primitives": [
+                    {
+                        "attributes": {"POSITION": position_accessor, "NORMAL": normal_accessor},
+                        "indices": index_accessor,
+                        "targets": targets,
+                        "material": 0,
+                        "mode": GL_TRIANGLES,
+                    }
+                ],
+            }
+        ],
+        "materials": [
+            {
+                "name": "animated_water_surface",
+                "pbrMetallicRoughness": {
+                    "baseColorFactor": [0.08, 0.32, 0.72, 0.88],
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": 0.35,
+                },
+                "alphaMode": "BLEND",
+            }
+        ],
+        "animations": [
+            {
+                "name": "spectral_choppy_wave_surface_weights",
+                "samplers": [
+                    {
+                        "input": time_accessor,
+                        "output": weight_accessor,
+                        "interpolation": "LINEAR",
+                    }
+                ],
+                "channels": [{"sampler": 0, "target": {"node": 0, "path": "weights"}}],
+            }
+        ],
+        "buffers": [buffer],
+        "bufferViews": buffer_views,
+        "accessors": accessors,
+    }
+    summary = {
+        "rows": rows,
+        "cols": cols,
+        "frame_count": len(frames),
+        "duration_seconds": float(times[-1]) if len(times) else 0.0,
+        "frame_duration_seconds": frame_duration,
+        "vertex_count": int(len(base_positions)),
+        "triangle_count": int(len(indices) // 3),
+        "morph_target_count": target_count,
+        "byte_length": len(buffer_data),
+    }
+    return {"gltf": gltf, "buffer_data": buffer_data, "summary": summary}
+
+
+def write_animated_gltf_scene(
+    path: Path,
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    frame_duration: float,
+) -> dict:
+    document = build_animated_gltf_document(frames, frame_duration=frame_duration, embed_buffer=True)
+    summary = document["summary"]
+    summary["path"] = str(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(document["gltf"], indent=2), encoding="utf-8")
+    return summary
+
+
+def write_animated_glb_scene(
+    path: Path,
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    frame_duration: float,
+) -> dict:
+    document = build_animated_gltf_document(frames, frame_duration=frame_duration, embed_buffer=False)
+    glb = build_glb_bytes(document["gltf"], document["buffer_data"])
+    summary = document["summary"]
+    summary["path"] = str(path)
+    summary["glb_length"] = len(glb)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(glb)
+    return summary
+
+
 def write_gltf_sequence(
     output_dir: Path,
     frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
@@ -346,6 +500,8 @@ def export_final_choppy_gltf(
     glb_output: Path | None,
     sequence_output_dir: Path | None,
     glb_sequence_output_dir: Path | None,
+    animated_output: Path | None,
+    animated_glb_output: Path | None,
     size: int,
     steps: int,
     frame_every: int,
@@ -364,6 +520,7 @@ def export_final_choppy_gltf(
     foam_threshold: float,
     max_foam_points: int,
     foam_z_offset: float,
+    animation_frame_duration: float,
     device: torch.device,
 ) -> dict:
     frames = simulate_choppy_frames(
@@ -432,11 +589,31 @@ def export_final_choppy_gltf(
         if glb_sequence_output_dir is not None
         else None
     )
+    animated_summary = (
+        write_animated_gltf_scene(
+            animated_output,
+            frames,
+            frame_duration=animation_frame_duration,
+        )
+        if animated_output is not None
+        else None
+    )
+    animated_glb_summary = (
+        write_animated_glb_scene(
+            animated_glb_output,
+            frames,
+            frame_duration=animation_frame_duration,
+        )
+        if animated_glb_output is not None
+        else None
+    )
     return {
         "final": final_summary,
         "glb": glb_summary,
         "sequence": sequence_summary,
         "glb_sequence": glb_sequence_summary,
+        "animated": animated_summary,
+        "animated_glb": animated_glb_summary,
     }
 
 
@@ -460,10 +637,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--foam-threshold", type=float, default=0.018, help="Minimum eta steepness for exported foam points.")
     parser.add_argument("--max-foam-points", type=int, default=900, help="Maximum exported foam points.")
     parser.add_argument("--foam-z-offset", type=float, default=0.01, help="Vertical offset applied to exported foam points.")
+    parser.add_argument("--animation-frame-duration", type=float, default=None, help="Seconds between saved frames in animated glTF/GLB. Defaults to frame_every * dt.")
     parser.add_argument("--output", type=Path, default=Path("outputs/spectral_choppy_wave_final.gltf"), help="Output glTF path.")
     parser.add_argument("--glb-output", type=Path, default=None, help="Optional output binary GLB path for the final frame.")
     parser.add_argument("--sequence-output-dir", type=Path, default=None, help="Optional directory for glTF files for every saved frame.")
     parser.add_argument("--glb-sequence-output-dir", type=Path, default=None, help="Optional directory for GLB files for every saved frame.")
+    parser.add_argument("--animated-output", type=Path, default=None, help="Optional output animated glTF path using morph targets.")
+    parser.add_argument("--animated-glb-output", type=Path, default=None, help="Optional output animated binary GLB path using morph targets.")
     return parser.parse_args()
 
 
@@ -497,6 +677,9 @@ def main() -> None:
         foam_threshold=args.foam_threshold,
         max_foam_points=args.max_foam_points,
         foam_z_offset=args.foam_z_offset,
+        animation_frame_duration=args.animation_frame_duration if args.animation_frame_duration is not None else args.frame_every * args.dt,
+        animated_output=args.animated_output,
+        animated_glb_output=args.animated_glb_output,
         device=device,
     )
     print(f"Saved glTF: {summary['final']['path']}")
@@ -514,6 +697,13 @@ def main() -> None:
         print(f"Saved GLB sequence: {summary['glb_sequence']['directory']}")
         print(f"GLB sequence frames: {summary['glb_sequence']['frame_count']}")
         print(f"Saved GLB sequence manifest: {summary['glb_sequence']['manifest_path']}")
+    if summary["animated"] is not None:
+        print(f"Saved animated glTF: {summary['animated']['path']}")
+        print(f"Animated frames: {summary['animated']['frame_count']}")
+        print(f"Morph targets: {summary['animated']['morph_target_count']}")
+    if summary["animated_glb"] is not None:
+        print(f"Saved animated GLB: {summary['animated_glb']['path']}")
+        print(f"Animated GLB bytes: {summary['animated_glb']['glb_length']}")
 
 
 if __name__ == "__main__":

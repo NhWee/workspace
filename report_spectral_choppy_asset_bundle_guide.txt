@@ -16,7 +16,7 @@ report는 다음 정보를 정리합니다.
 - total asset size
 - missing asset count
 - simulation parameter
-- viewer, OBJ, PLY, glTF, GLB, sequence별 존재 여부
+- viewer, OBJ, PLY, glTF, GLB, animated glTF/GLB, sequence별 존재 여부
 - 각 asset의 file/directory size
 - geometry count: vertices, triangles, foam points
 

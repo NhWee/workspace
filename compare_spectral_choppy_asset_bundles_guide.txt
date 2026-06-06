@@ -23,6 +23,9 @@ Markdown 비교 표를 만듭니다.
 - horizontal_displacement_p95_max
 - total asset size
 - final GLB size
+- animated GLB size
+- animated frame count
+- animated morph target count
 - final GLB vertex/triangle/foam point count
 - GLB sequence frame count
 - missing asset count

@@ -17,6 +17,8 @@ export_spectral_choppy_asset_bundle.py 가이드
 - `foam_sequence/`: frame별 foam PLY sequence
 - `final.gltf`: final frame embedded glTF scene
 - `final.glb`: final frame binary GLB scene
+- `animated.gltf`: morph target 기반 animated glTF scene
+- `animated.glb`: morph target 기반 animated binary GLB scene
 - `gltf_sequence/`: frame별 glTF sequence
 - `glb_sequence/`: frame별 GLB sequence
 - `bundle_manifest.json`: 전체 산출물 경로와 summary
@@ -70,10 +72,10 @@ bundle report 생성:
 5. 한계
 -------
 
-이 bundle은 frame별 scene 파일 묶음입니다.
+이 bundle은 final scene, frame별 scene 파일 묶음, morph target animated scene을 함께 저장합니다.
 
-- glTF/GLB animation clip은 아직 만들지 않습니다.
 - foam은 steepness 기반 point cloud입니다.
+- animated glTF/GLB는 water surface만 morph target으로 재생하며, foam point animation은 아직 포함하지 않습니다.
 - 모든 포맷을 저장하므로 큰 grid와 많은 frame에서는 출력 크기가 빠르게 증가합니다.
 
 
@@ -81,7 +83,6 @@ bundle report 생성:
 -----------------
 
 - bundle manifest 기반 비교/report 생성
-- animation clip이 포함된 glTF/GLB export
 - Three.js/WebGPU viewer에서 bundle manifest를 직접 읽어 playback
 - 더 물리적인 breaking wave와 spray layer 추가
 

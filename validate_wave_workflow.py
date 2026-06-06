@@ -25,7 +25,14 @@ from export_spectral_choppy_mesh import (
     write_obj_mesh,
     write_obj_sequence,
 )
-from export_spectral_choppy_gltf import write_glb_scene, write_glb_sequence, write_gltf_scene, write_gltf_sequence
+from export_spectral_choppy_gltf import (
+    write_animated_glb_scene,
+    write_animated_gltf_scene,
+    write_glb_scene,
+    write_glb_sequence,
+    write_gltf_scene,
+    write_gltf_sequence,
+)
 from report_spectral_choppy_asset_bundle import write_report as write_asset_bundle_report
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
@@ -462,6 +469,18 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
         max_foam_points=64,
         foam_z_offset=0.01,
     )
+    choppy_animated_gltf_path = output_dir / "workflow_validation_spectral_choppy_animated.gltf"
+    choppy_animated_gltf_summary = write_animated_gltf_scene(
+        choppy_animated_gltf_path,
+        choppy_frames,
+        frame_duration=0.48,
+    )
+    choppy_animated_glb_path = output_dir / "workflow_validation_spectral_choppy_animated.glb"
+    choppy_animated_glb_summary = write_animated_glb_scene(
+        choppy_animated_glb_path,
+        choppy_frames,
+        frame_duration=0.48,
+    )
     choppy_metadata_path = output_dir / "workflow_validation_spectral_choppy_mesh.json"
     write_metadata(
         choppy_metadata_path,
@@ -489,6 +508,8 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     choppy_gltf_sequence_manifest = json.loads((choppy_gltf_sequence_dir / "sequence_manifest.json").read_text(encoding="utf-8"))
     choppy_glb_sequence_manifest = json.loads((choppy_glb_sequence_dir / "sequence_manifest.json").read_text(encoding="utf-8"))
     choppy_glb_sequence_header = (choppy_glb_sequence_dir / "frame_0000.glb").read_bytes()[:12]
+    choppy_animated_gltf = json.loads(choppy_animated_gltf_path.read_text(encoding="utf-8"))
+    choppy_animated_glb_header = choppy_animated_glb_path.read_bytes()[:12]
     choppy_metadata_text = choppy_metadata_path.read_text(encoding="utf-8")
     assert_condition("\nv " in choppy_mesh_text, "Choppy OBJ mesh is missing vertices.")
     assert_condition("\nvn " in choppy_mesh_text, "Choppy OBJ mesh is missing vertex normals.")
@@ -533,6 +554,13 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(choppy_glb_sequence_manifest["format"] == "glb_sequence", "Choppy GLB sequence manifest format mismatch.")
     assert_condition(choppy_glb_sequence_header[:4] == b"glTF", "Choppy GLB sequence first frame magic header mismatch.")
     assert_condition(int.from_bytes(choppy_glb_sequence_header[4:8], "little") == 2, "Choppy GLB sequence first frame version mismatch.")
+    assert_condition(choppy_animated_gltf_summary["frame_count"] == len(choppy_frames), "Choppy animated glTF frame count mismatch.")
+    assert_condition(choppy_animated_gltf_summary["morph_target_count"] == len(choppy_frames) - 1, "Choppy animated glTF morph target count mismatch.")
+    assert_condition(choppy_animated_gltf["animations"][0]["channels"][0]["target"]["path"] == "weights", "Choppy animated glTF should animate morph weights.")
+    assert_condition("targets" in choppy_animated_gltf["meshes"][0]["primitives"][0], "Choppy animated glTF morph targets missing.")
+    assert_condition(choppy_animated_glb_header[:4] == b"glTF", "Choppy animated GLB magic header mismatch.")
+    assert_condition(int.from_bytes(choppy_animated_glb_header[4:8], "little") == 2, "Choppy animated GLB version mismatch.")
+    assert_condition(choppy_animated_glb_summary["glb_length"] == choppy_animated_glb_path.stat().st_size, "Choppy animated GLB length mismatch.")
     choppy_bundle_dir = output_dir / "workflow_validation_spectral_choppy_asset_bundle"
     choppy_bundle_manifest = write_asset_bundle(
         choppy_bundle_dir,
@@ -543,6 +571,7 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
             "steps": max(24, steps // 3),
             "frame_every": max(6, frame_every // 2),
             "domain_size": 8.0,
+            "dt": 0.04,
             "source": "workflow_validation",
         },
         device=device,
@@ -555,6 +584,8 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition((choppy_bundle_dir / "viewer.html").exists(), "Choppy asset bundle viewer missing.")
     assert_condition((choppy_bundle_dir / "final.glb").exists(), "Choppy asset bundle final GLB missing.")
     assert_condition((choppy_bundle_dir / "glb_sequence" / "frame_0000.glb").exists(), "Choppy asset bundle GLB sequence missing.")
+    assert_condition((choppy_bundle_dir / "animated.glb").exists(), "Choppy asset bundle animated GLB missing.")
+    assert_condition(choppy_bundle_manifest["animated_glb"]["morph_target_count"] == len(choppy_frames) - 1, "Choppy asset bundle animated GLB morph target mismatch.")
     assert_condition("metrics" in choppy_bundle_manifest, "Choppy asset bundle metrics missing.")
     assert_condition((choppy_bundle_dir / "choppy_wave_metrics.csv").exists(), "Choppy asset bundle metric CSV missing.")
     assert_condition(choppy_bundle_manifest["metrics"]["summary"]["frame_count"] == len(choppy_frames), "Choppy asset bundle metric frame count mismatch.")
@@ -564,12 +595,14 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition("## Metrics" in choppy_bundle_report_text, "Choppy asset bundle report metrics section missing.")
     assert_condition("final GLB" in choppy_bundle_report_text, "Choppy asset bundle report final GLB row missing.")
     assert_condition("GLB sequence" in choppy_bundle_report_text, "Choppy asset bundle report GLB sequence row missing.")
+    assert_condition("animated GLB" in choppy_bundle_report_text, "Choppy asset bundle report animated GLB row missing.")
     assert_condition("missing_assets: `0`" in choppy_bundle_report_text, "Choppy asset bundle report found missing assets.")
     choppy_bundle_comparison_path = output_dir / "workflow_validation_spectral_choppy_asset_bundle_comparison.md"
     write_asset_bundle_comparison([choppy_bundle_dir], choppy_bundle_comparison_path)
     choppy_bundle_comparison_text = choppy_bundle_comparison_path.read_text(encoding="utf-8")
     assert_condition("Spectral Choppy Wave Asset Bundle Comparison" in choppy_bundle_comparison_text, "Choppy asset bundle comparison title missing.")
     assert_condition("GLB Seq Frames" in choppy_bundle_comparison_text, "Choppy asset bundle comparison GLB sequence column missing.")
+    assert_condition("Animated GLB Size" in choppy_bundle_comparison_text, "Choppy asset bundle comparison animated GLB column missing.")
     assert_condition("Steepness P95 Max" in choppy_bundle_comparison_text, "Choppy asset bundle comparison metric column missing.")
     assert_condition("workflow_validation_spectral_choppy_asset_bundle" in choppy_bundle_comparison_text, "Choppy asset bundle comparison row missing.")
     choppy_bundle_sweep = run_asset_bundle_sweep(
@@ -603,6 +636,7 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(len(choppy_bundle_sweep["runs"]) == 2, "Choppy asset bundle sweep should create two runs.")
     assert_condition("00_choppiness_0p45" in choppy_bundle_sweep_text, "Choppy asset bundle sweep first run missing.")
     assert_condition("01_choppiness_0p75" in choppy_bundle_sweep_text, "Choppy asset bundle sweep second run missing.")
+    assert_condition("Animated GLB Size" in choppy_bundle_sweep_text, "Choppy asset bundle sweep comparison animated GLB column missing.")
     assert_condition("Steepness P95 Max" in choppy_bundle_sweep_text, "Choppy asset bundle sweep comparison metric column missing.")
     assert_condition("metrics" in choppy_bundle_sweep["runs"][0], "Choppy asset bundle sweep run metrics missing.")
     print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")

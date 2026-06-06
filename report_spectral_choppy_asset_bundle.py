@@ -56,6 +56,8 @@ def build_report(manifest_path: Path) -> str:
         make_asset_row(bundle_dir, "final GLB", manifest.get("glb", {})),
         make_asset_row(bundle_dir, "glTF sequence", manifest.get("gltf_sequence", {}), "directory"),
         make_asset_row(bundle_dir, "GLB sequence", manifest.get("glb_sequence", {}), "directory"),
+        make_asset_row(bundle_dir, "animated glTF", manifest.get("animated_gltf", {})),
+        make_asset_row(bundle_dir, "animated GLB", manifest.get("animated_glb", {})),
     ]
     missing = [row["asset"] for row in rows if not row["exists"]]
     total_size = sum(row["size_bytes"] for row in rows)
