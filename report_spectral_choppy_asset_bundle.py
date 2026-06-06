@@ -97,6 +97,9 @@ def build_report(manifest_path: Path) -> str:
                 f"| foam_ratio_mean | `{metric_summary.get('foam_ratio_mean', '')}` |",
                 f"| foam_point_count_max | `{metric_summary.get('foam_point_count_max', '')}` |",
                 f"| horizontal_displacement_p95_max | `{metric_summary.get('horizontal_displacement_p95_max', '')}` |",
+                f"| folded_triangle_ratio_max | `{metric_summary.get('folded_triangle_ratio_max', '')}` |",
+                f"| folded_triangle_count_max | `{metric_summary.get('folded_triangle_count_max', '')}` |",
+                f"| signed_triangle_area_min_min | `{metric_summary.get('signed_triangle_area_min_min', '')}` |",
             ]
         )
 

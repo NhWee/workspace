@@ -21,6 +21,7 @@ Markdown 비교 표를 만듭니다.
 - steepness_p95_max
 - foam_ratio_mean
 - horizontal_displacement_p95_max
+- folded_triangle_ratio_max
 - total asset size
 - final GLB size
 - animated GLB size

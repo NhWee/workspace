@@ -61,6 +61,7 @@ def summarize_bundle(path: Path) -> dict:
         "steepness_p95_max": metric_summary.get("steepness_p95_max", ""),
         "foam_ratio_mean": metric_summary.get("foam_ratio_mean", ""),
         "horizontal_displacement_p95_max": metric_summary.get("horizontal_displacement_p95_max", ""),
+        "folded_triangle_ratio_max": metric_summary.get("folded_triangle_ratio_max", ""),
     }
 
 
@@ -68,12 +69,12 @@ def build_comparison_table(summaries: list[dict]) -> str:
     lines = [
         "# Spectral Choppy Wave Asset Bundle Comparison",
         "",
-        "| Bundle | Frames | Grid | Steps | Frame Every | Surface Points | Choppiness | Foam Threshold | Eta Range Max | Steepness P95 Max | Foam Ratio Mean | Disp P95 Max | Total Size | GLB Size | Animated GLB Size | Animated Frames | Morph Targets | Vertices | Triangles | Foam Points | GLB Seq Frames | Missing |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "| Bundle | Frames | Grid | Steps | Frame Every | Surface Points | Choppiness | Foam Threshold | Eta Range Max | Steepness P95 Max | Foam Ratio Mean | Disp P95 Max | Fold Ratio Max | Total Size | GLB Size | Animated GLB Size | Animated Frames | Morph Targets | Vertices | Triangles | Foam Points | GLB Seq Frames | Missing |",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for summary in summaries:
         lines.append(
-            "| {name} | {frame_count} | {size} | {steps} | {frame_every} | {max_surface_points} | {choppiness} | {foam_threshold} | {eta_range_max} | {steepness_p95_max} | {foam_ratio_mean} | {horizontal_displacement_p95_max} | {total_size} | {glb_size} | {animated_glb_size} | {animated_frames} | {animated_morph_targets} | {vertices} | {triangles} | {foam_points} | {glb_sequence_frames} | {missing_assets} |".format(
+            "| {name} | {frame_count} | {size} | {steps} | {frame_every} | {max_surface_points} | {choppiness} | {foam_threshold} | {eta_range_max} | {steepness_p95_max} | {foam_ratio_mean} | {horizontal_displacement_p95_max} | {folded_triangle_ratio_max} | {total_size} | {glb_size} | {animated_glb_size} | {animated_frames} | {animated_morph_targets} | {vertices} | {triangles} | {foam_points} | {glb_sequence_frames} | {missing_assets} |".format(
                 name=summary["name"],
                 frame_count=summary["frame_count"],
                 size=summary["size"],
@@ -86,6 +87,7 @@ def build_comparison_table(summaries: list[dict]) -> str:
                 steepness_p95_max=summary["steepness_p95_max"],
                 foam_ratio_mean=summary["foam_ratio_mean"],
                 horizontal_displacement_p95_max=summary["horizontal_displacement_p95_max"],
+                folded_triangle_ratio_max=summary["folded_triangle_ratio_max"],
                 total_size=format_bytes(summary["total_size_bytes"]),
                 glb_size=format_bytes(int(summary["glb_size_bytes"] or 0)),
                 animated_glb_size=format_bytes(int(summary["animated_glb_size_bytes"] or 0)),

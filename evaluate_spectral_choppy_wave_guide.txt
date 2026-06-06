@@ -14,12 +14,14 @@ frame별 metric:
 - `steepness_mean`, `steepness_p95`, `steepness_max`
 - `foam_point_count`, `foam_ratio`
 - `horizontal_displacement_mean`, `horizontal_displacement_p95`, `horizontal_displacement_max`
+- `folded_triangle_count`, `folded_triangle_ratio`
+- `signed_triangle_area_min`, `signed_triangle_area_mean`
 
 전체 summary:
 
 - 각 frame metric의 평균과 최대값
 - 비교에서 자주 쓰는 `eta_range_max`, `steepness_p95_max`, `foam_ratio_mean`,
-  `horizontal_displacement_p95_max`
+  `horizontal_displacement_p95_max`, `folded_triangle_ratio_max`
 
 
 2. 실행 방법
@@ -61,6 +63,8 @@ asset bundle export를 실행할 때도 같은 metric 산출물이 bundle 폴더
 - `steepness_p95_max`: 대부분의 날카로운 파도 경사를 대표합니다. foam 후보와 시각적 choppy 느낌을 볼 때 유용합니다.
 - `foam_ratio_mean`: foam threshold를 넘은 point 비율입니다. 너무 높으면 foam이 과밀해질 수 있습니다.
 - `horizontal_displacement_p95_max`: choppiness로 생긴 수평 변위 크기입니다. 너무 크면 mesh가 접히거나 비현실적으로 보일 수 있습니다.
+- `folded_triangle_ratio_max`: XY 평면에서 뒤집힌 triangle 비율입니다. 0에 가까울수록 export/animation geometry가 안정적입니다.
+- `signed_triangle_area_min_min`: 가장 작은 signed triangle area입니다. 음수면 해당 frame에 접힌 triangle이 있다는 뜻입니다.
 
 
 5. 한계
@@ -70,4 +74,4 @@ asset bundle export를 실행할 때도 같은 metric 산출물이 bundle 폴더
 
 - 물리적으로 정확한 breaking wave 판정은 아닙니다.
 - foam은 steepness threshold 기반의 시각적 후보입니다.
-- mesh self-intersection 검사는 아직 포함하지 않습니다.
+- XY 평면 기준 triangle fold 감지는 포함하지만, 완전한 3D self-intersection 검사는 아닙니다.

@@ -17,6 +17,33 @@ def make_reference_grid(shape: tuple[int, int], domain_size: float) -> tuple[np.
     return reference_x, reference_y
 
 
+def signed_triangle_areas_2d(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> np.ndarray:
+    ab = b - a
+    ac = c - a
+    return 0.5 * (ab[..., 0] * ac[..., 1] - ab[..., 1] * ac[..., 0])
+
+
+def mesh_fold_metrics(x_grid: np.ndarray, y_grid: np.ndarray) -> dict:
+    points = np.stack((x_grid, y_grid), axis=-1)
+    p00 = points[:-1, :-1]
+    p01 = points[:-1, 1:]
+    p10 = points[1:, :-1]
+    p11 = points[1:, 1:]
+    triangle_areas = np.concatenate(
+        (
+            signed_triangle_areas_2d(p00, p01, p11).reshape(-1),
+            signed_triangle_areas_2d(p00, p11, p10).reshape(-1),
+        )
+    )
+    folded = triangle_areas <= 0.0
+    return {
+        "signed_triangle_area_min": float(np.min(triangle_areas)),
+        "signed_triangle_area_mean": float(np.mean(triangle_areas)),
+        "folded_triangle_count": int(np.count_nonzero(folded)),
+        "folded_triangle_ratio": float(np.count_nonzero(folded) / len(triangle_areas)),
+    }
+
+
 def frame_metrics(
     frame_index: int,
     x_grid: np.ndarray,
@@ -30,7 +57,7 @@ def frame_metrics(
     foam_mask = steepness >= foam_threshold
     reference_x, reference_y = make_reference_grid(z_grid.shape, domain_size)
     horizontal_displacement = np.sqrt((x_grid - reference_x) ** 2 + (y_grid - reference_y) ** 2)
-    return {
+    metrics = {
         "frame_index": frame_index,
         "eta_min": float(np.min(z_grid)),
         "eta_max": float(np.max(z_grid)),
@@ -46,6 +73,8 @@ def frame_metrics(
         "horizontal_displacement_p95": float(np.percentile(horizontal_displacement, 95.0)),
         "horizontal_displacement_max": float(np.max(horizontal_displacement)),
     }
+    metrics.update(mesh_fold_metrics(x_grid, y_grid))
+    return metrics
 
 
 def summarize_frame_metrics(frame_rows: list[dict]) -> dict:
@@ -57,6 +86,7 @@ def summarize_frame_metrics(frame_rows: list[dict]) -> dict:
         values = np.array([row[key] for row in frame_rows], dtype=np.float64)
         summary[f"{key}_mean"] = float(np.mean(values))
         summary[f"{key}_max"] = float(np.max(values))
+        summary[f"{key}_min"] = float(np.min(values))
     return summary
 
 
@@ -104,6 +134,9 @@ def build_metric_report(metrics: dict) -> str:
         f"| foam_point_count_max | {summary['foam_point_count_max']:.0f} |",
         f"| horizontal_displacement_p95_max | {summary['horizontal_displacement_p95_max']:.6g} |",
         f"| horizontal_displacement_max_max | {summary['horizontal_displacement_max_max']:.6g} |",
+        f"| folded_triangle_ratio_max | {summary['folded_triangle_ratio_max']:.6g} |",
+        f"| folded_triangle_count_max | {summary['folded_triangle_count_max']:.0f} |",
+        f"| signed_triangle_area_min_min | {summary['signed_triangle_area_min_min']:.6g} |",
     ]
     return "\n".join(lines) + "\n"
 

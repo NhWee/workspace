@@ -35,7 +35,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 20. streamline HTML marker 확인
 21. spectral wave velocity dataset과 Plotly/speed viewer 생성 확인
 22. spectral choppy wave viewer 생성 확인
-23. spectral choppy wave height/steepness/foam/displacement metric 확인
+23. spectral choppy wave height/steepness/foam/displacement/fold metric 확인
 24. spectral choppy wave OBJ mesh/sequence, foam PLY/sequence, glTF/GLB scene/sequence, animated glTF/GLB export 확인
 25. spectral choppy wave 통합 asset bundle export, animated asset, metric 산출물, Markdown report 확인
 26. spectral choppy wave asset bundle validation과 bundle comparison 확인
@@ -122,7 +122,7 @@ validate_wave_workflow.py는 다음을 순서대로 확인합니다.
 - streamline HTML 생성 성공
 - spectral wave velocity dataset/viewer 생성 성공
 - spectral choppy wave viewer 생성 성공
-- spectral choppy wave metric CSV/JSON/Markdown 생성 성공
+- spectral choppy wave metric CSV/JSON/Markdown 생성 성공, fold metric 확인 성공
 - spectral choppy wave OBJ mesh/sequence, foam PLY/sequence, glTF/GLB scene/sequence, animated glTF/GLB export 확인 성공
 - spectral choppy wave 통합 asset bundle export, animated asset, metric 산출물, Markdown report 확인 성공
 - spectral choppy wave asset bundle validation과 bundle comparison 확인 성공
