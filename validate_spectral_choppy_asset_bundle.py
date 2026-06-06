@@ -77,6 +77,10 @@ def first_primitive(gltf: dict) -> dict:
     return gltf.get("meshes", [{}])[0].get("primitives", [{}])[0]
 
 
+def primitive_count(gltf: dict) -> int:
+    return len(gltf.get("meshes", [{}])[0].get("primitives", []))
+
+
 def validate_bundle(bundle_dir: Path, manifest_path: Path | None = None) -> dict:
     resolved_manifest_path = resolve_manifest_path(bundle_dir, manifest_path)
     manifest = json.loads(resolved_manifest_path.read_text(encoding="utf-8"))
@@ -122,6 +126,7 @@ def validate_bundle(bundle_dir: Path, manifest_path: Path | None = None) -> dict
             animated_gltf = read_gltf(animated_gltf_path)
             primitive = first_primitive(animated_gltf)
             add_check(checks, "animated glTF weight animation", has_weight_animation(animated_gltf), str(animated_gltf_path))
+            add_check(checks, "animated glTF water and foam primitives", primitive_count(animated_gltf) >= 2, str(animated_gltf_path))
             add_check(checks, "animated glTF morph targets", bool(primitive.get("targets")), str(animated_gltf_path))
             add_check(
                 checks,
@@ -139,6 +144,7 @@ def validate_bundle(bundle_dir: Path, manifest_path: Path | None = None) -> dict
             primitive = first_primitive(animated_glb)
             add_check(checks, "animated GLB header", animated_glb_header["version"] == 2, str(animated_glb_path))
             add_check(checks, "animated GLB weight animation", has_weight_animation(animated_glb), str(animated_glb_path))
+            add_check(checks, "animated GLB water and foam primitives", primitive_count(animated_glb) >= 2, str(animated_glb_path))
             add_check(
                 checks,
                 "animated GLB morph target count",

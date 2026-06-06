@@ -17,6 +17,7 @@ validate_spectral_choppy_asset_bundle.py 가이드
 - final glTF 2.0 버전과 water/foam primitive 구조
 - final GLB header와 JSON chunk 파싱
 - animated glTF/GLB의 weight animation channel
+- animated glTF/GLB의 water/foam primitive 구조
 - animated glTF/GLB의 morph target count가 `frame_count - 1`인지 확인
 
 

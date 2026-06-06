@@ -75,7 +75,8 @@ bundle report 생성:
 이 bundle은 final scene, frame별 scene 파일 묶음, morph target animated scene을 함께 저장합니다.
 
 - foam은 steepness 기반 point cloud입니다.
-- animated glTF/GLB는 water surface만 morph target으로 재생하며, foam point animation은 아직 포함하지 않습니다.
+- animated glTF/GLB는 water surface와 foam point를 morph target으로 재생합니다.
+- animated foam은 고정 point capacity에 맞춰 부족한 point를 수면 아래로 숨기는 방식입니다.
 - 모든 포맷을 저장하므로 큰 grid와 많은 frame에서는 출력 크기가 빠르게 증가합니다.
 
 

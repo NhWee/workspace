@@ -97,11 +97,17 @@ def write_asset_bundle(
         output_dir / "animated.gltf",
         frames,
         frame_duration=animation_frame_duration,
+        foam_threshold=foam_threshold,
+        max_foam_points=max_foam_points,
+        foam_z_offset=foam_z_offset,
     )
     animated_glb_summary = write_animated_glb_scene(
         output_dir / "animated.glb",
         frames,
         frame_duration=animation_frame_duration,
+        foam_threshold=foam_threshold,
+        max_foam_points=max_foam_points,
+        foam_z_offset=foam_z_offset,
     )
     metric_summary = write_metric_outputs(
         evaluate_choppy_frames(frames, domain_size, foam_threshold),

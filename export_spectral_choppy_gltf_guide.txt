@@ -21,7 +21,7 @@ morph target animation으로 묶은 단일 animated scene도 저장합니다.
 - binary data: base64 data URI로 glTF 내부에 포함
 - GLB: JSON chunk와 binary chunk를 하나의 binary 파일로 저장
 - sequence manifest: frame별 glTF 파일 경로와 요약 정보
-- animated glTF/GLB: 저장된 frame을 morph target weight animation으로 재생
+- animated glTF/GLB: 저장된 water surface와 foam point frame을 morph target weight animation으로 재생
 
 OBJ/PLY export는 파일을 역할별로 나누는 방식이고, glTF export는 final frame의
 표면과 foam point를 하나의 scene 파일로 묶는 방식입니다.
@@ -95,10 +95,10 @@ animated GLB export:
 5. 한계
 -------
 
-final glTF/GLB는 final frame scene입니다. animated glTF/GLB는 water surface morph target animation입니다.
+final glTF/GLB는 final frame scene입니다. animated glTF/GLB는 water surface와 foam point morph target animation입니다.
 
 - foam은 point primitive이며 실제 유체 입자 simulation은 아닙니다.
-- animated glTF/GLB에는 foam point animation을 아직 포함하지 않습니다.
+- animated foam은 고정 point capacity에 맞춘 steepness 기반 point primitive입니다.
 - embedded base64 방식이므로 큰 grid에서는 파일 크기가 빠르게 커집니다.
 - sequence export는 animation clip이 아니라 frame별 scene 파일 묶음입니다.
 

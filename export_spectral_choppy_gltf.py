@@ -282,6 +282,9 @@ def build_glb_bytes(gltf: dict, buffer_data: bytes) -> bytes:
 def build_animated_gltf_document(
     frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
     frame_duration: float,
+    foam_threshold: float,
+    max_foam_points: int,
+    foam_z_offset: float,
     embed_buffer: bool,
 ) -> dict:
     if len(frames) < 2:
@@ -297,6 +300,24 @@ def build_animated_gltf_document(
     base_positions = np.stack((x0, y0, z0), axis=-1).reshape(-1, 3).astype(np.float32)
     base_normals = compute_vertex_normals(x0, y0, z0).reshape(-1, 3).astype(np.float32)
     indices = make_triangle_indices(rows, cols)
+    hidden_foam_z = float(np.min([np.min(z_grid) for _, _, z_grid in frames]) - max(1.0, foam_z_offset * 10.0))
+
+    def make_padded_foam_positions(x_grid: np.ndarray, y_grid: np.ndarray, z_grid: np.ndarray) -> np.ndarray:
+        foam_x, foam_y, foam_z, _ = sample_foam_points(
+            x_grid,
+            y_grid,
+            z_grid,
+            foam_threshold,
+            max_foam_points,
+        )
+        padded = np.zeros((max_foam_points, 3), dtype=np.float32)
+        padded[:, 2] = hidden_foam_z
+        point_count = min(len(foam_x), max_foam_points)
+        if point_count > 0:
+            padded[:point_count, 0] = foam_x[:point_count]
+            padded[:point_count, 1] = foam_y[:point_count]
+            padded[:point_count, 2] = foam_z[:point_count] + foam_z_offset
+        return padded
 
     chunks: list[bytes] = []
     buffer_views: list[dict] = []
@@ -304,18 +325,26 @@ def build_animated_gltf_document(
     position_accessor = append_buffer(chunks, buffer_views, accessors, base_positions, GL_FLOAT, "VEC3", GL_ARRAY_BUFFER)
     normal_accessor = append_buffer(chunks, buffer_views, accessors, base_normals, GL_FLOAT, "VEC3", GL_ARRAY_BUFFER)
     index_accessor = append_buffer(chunks, buffer_views, accessors, indices, GL_UNSIGNED_INT, "SCALAR", GL_ELEMENT_ARRAY_BUFFER)
+    base_foam_positions = make_padded_foam_positions(x0, y0, z0)
+    foam_position_accessor = append_buffer(chunks, buffer_views, accessors, base_foam_positions, GL_FLOAT, "VEC3", GL_ARRAY_BUFFER)
 
-    targets = []
+    water_targets = []
+    foam_targets = []
     for frame_index, (x_grid, y_grid, z_grid) in enumerate(frames[1:], start=1):
         if x_grid.shape != x0.shape or y_grid.shape != x0.shape or z_grid.shape != x0.shape:
             raise ValueError(f"Frame {frame_index} shape does not match the first frame.")
         positions = np.stack((x_grid, y_grid, z_grid), axis=-1).reshape(-1, 3).astype(np.float32)
         delta_positions = positions - base_positions
         delta_accessor = append_buffer(chunks, buffer_views, accessors, delta_positions, GL_FLOAT, "VEC3", GL_ARRAY_BUFFER)
-        targets.append({"POSITION": delta_accessor})
+        water_targets.append({"POSITION": delta_accessor})
+
+        foam_positions = make_padded_foam_positions(x_grid, y_grid, z_grid)
+        foam_delta_positions = foam_positions - base_foam_positions
+        foam_delta_accessor = append_buffer(chunks, buffer_views, accessors, foam_delta_positions, GL_FLOAT, "VEC3", GL_ARRAY_BUFFER)
+        foam_targets.append({"POSITION": foam_delta_accessor})
 
     times = (np.arange(len(frames), dtype=np.float32) * np.float32(frame_duration)).reshape(-1)
-    target_count = len(targets)
+    target_count = len(water_targets)
     weights = np.zeros((len(frames), target_count), dtype=np.float32)
     for frame_index in range(1, len(frames)):
         weights[frame_index, frame_index - 1] = 1.0
@@ -340,9 +369,15 @@ def build_animated_gltf_document(
                     {
                         "attributes": {"POSITION": position_accessor, "NORMAL": normal_accessor},
                         "indices": index_accessor,
-                        "targets": targets,
+                        "targets": water_targets,
                         "material": 0,
                         "mode": GL_TRIANGLES,
+                    },
+                    {
+                        "attributes": {"POSITION": foam_position_accessor},
+                        "targets": foam_targets,
+                        "material": 1,
+                        "mode": GL_POINTS,
                     }
                 ],
             }
@@ -356,6 +391,14 @@ def build_animated_gltf_document(
                     "roughnessFactor": 0.35,
                 },
                 "alphaMode": "BLEND",
+            },
+            {
+                "name": "animated_foam_points",
+                "pbrMetallicRoughness": {
+                    "baseColorFactor": [1.0, 1.0, 1.0, 1.0],
+                    "metallicFactor": 0.0,
+                    "roughnessFactor": 0.75,
+                },
             }
         ],
         "animations": [
@@ -384,6 +427,7 @@ def build_animated_gltf_document(
         "vertex_count": int(len(base_positions)),
         "triangle_count": int(len(indices) // 3),
         "morph_target_count": target_count,
+        "foam_point_capacity": int(max_foam_points),
         "byte_length": len(buffer_data),
     }
     return {"gltf": gltf, "buffer_data": buffer_data, "summary": summary}
@@ -393,8 +437,18 @@ def write_animated_gltf_scene(
     path: Path,
     frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
     frame_duration: float,
+    foam_threshold: float = 0.018,
+    max_foam_points: int = 900,
+    foam_z_offset: float = 0.01,
 ) -> dict:
-    document = build_animated_gltf_document(frames, frame_duration=frame_duration, embed_buffer=True)
+    document = build_animated_gltf_document(
+        frames,
+        frame_duration=frame_duration,
+        foam_threshold=foam_threshold,
+        max_foam_points=max_foam_points,
+        foam_z_offset=foam_z_offset,
+        embed_buffer=True,
+    )
     summary = document["summary"]
     summary["path"] = str(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -406,8 +460,18 @@ def write_animated_glb_scene(
     path: Path,
     frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
     frame_duration: float,
+    foam_threshold: float = 0.018,
+    max_foam_points: int = 900,
+    foam_z_offset: float = 0.01,
 ) -> dict:
-    document = build_animated_gltf_document(frames, frame_duration=frame_duration, embed_buffer=False)
+    document = build_animated_gltf_document(
+        frames,
+        frame_duration=frame_duration,
+        foam_threshold=foam_threshold,
+        max_foam_points=max_foam_points,
+        foam_z_offset=foam_z_offset,
+        embed_buffer=False,
+    )
     glb = build_glb_bytes(document["gltf"], document["buffer_data"])
     summary = document["summary"]
     summary["path"] = str(path)
@@ -594,6 +658,9 @@ def export_final_choppy_gltf(
             animated_output,
             frames,
             frame_duration=animation_frame_duration,
+            foam_threshold=foam_threshold,
+            max_foam_points=max_foam_points,
+            foam_z_offset=foam_z_offset,
         )
         if animated_output is not None
         else None
@@ -603,6 +670,9 @@ def export_final_choppy_gltf(
             animated_glb_output,
             frames,
             frame_duration=animation_frame_duration,
+            foam_threshold=foam_threshold,
+            max_foam_points=max_foam_points,
+            foam_z_offset=foam_z_offset,
         )
         if animated_glb_output is not None
         else None
