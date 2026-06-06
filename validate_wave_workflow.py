@@ -22,7 +22,7 @@ from export_spectral_choppy_mesh import (
     write_obj_mesh,
     write_obj_sequence,
 )
-from export_spectral_choppy_gltf import write_glb_scene, write_gltf_scene, write_gltf_sequence
+from export_spectral_choppy_gltf import write_glb_scene, write_glb_sequence, write_gltf_scene, write_gltf_sequence
 from shallow_water_bathymetry_3d import compute_cfl_dt, make_bathymetry, simulate_bathymetry
 from shallow_water_particle_animation_viewer import build_particle_animation_figure
 from shallow_water_particle_viewer import bilinear_sample, make_particle_seeds, make_wet_mask, trace_particles
@@ -440,6 +440,14 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
         max_foam_points=64,
         foam_z_offset=0.01,
     )
+    choppy_glb_sequence_dir = output_dir / "workflow_validation_spectral_choppy_glb_sequence"
+    choppy_glb_sequence_summary = write_glb_sequence(
+        choppy_glb_sequence_dir,
+        choppy_frames,
+        foam_threshold=0.0,
+        max_foam_points=64,
+        foam_z_offset=0.01,
+    )
     choppy_metadata_path = output_dir / "workflow_validation_spectral_choppy_mesh.json"
     write_metadata(
         choppy_metadata_path,
@@ -465,6 +473,8 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     choppy_gltf = json.loads(choppy_gltf_path.read_text(encoding="utf-8"))
     choppy_glb_header = choppy_glb_path.read_bytes()[:12]
     choppy_gltf_sequence_manifest = json.loads((choppy_gltf_sequence_dir / "sequence_manifest.json").read_text(encoding="utf-8"))
+    choppy_glb_sequence_manifest = json.loads((choppy_glb_sequence_dir / "sequence_manifest.json").read_text(encoding="utf-8"))
+    choppy_glb_sequence_header = (choppy_glb_sequence_dir / "frame_0000.glb").read_bytes()[:12]
     choppy_metadata_text = choppy_metadata_path.read_text(encoding="utf-8")
     assert_condition("\nv " in choppy_mesh_text, "Choppy OBJ mesh is missing vertices.")
     assert_condition("\nvn " in choppy_mesh_text, "Choppy OBJ mesh is missing vertex normals.")
@@ -505,6 +515,10 @@ def validate_workflow(size: int, steps: int, frame_every: int, output_dir: Path)
     assert_condition(choppy_gltf_sequence_summary["frame_count"] == len(choppy_frames), "Choppy glTF sequence frame count mismatch.")
     assert_condition(choppy_gltf_sequence_manifest["format"] == "embedded_gltf_sequence", "Choppy glTF sequence manifest format mismatch.")
     assert_condition((choppy_gltf_sequence_dir / "frame_0000.gltf").exists(), "Choppy glTF sequence first frame missing.")
+    assert_condition(choppy_glb_sequence_summary["frame_count"] == len(choppy_frames), "Choppy GLB sequence frame count mismatch.")
+    assert_condition(choppy_glb_sequence_manifest["format"] == "glb_sequence", "Choppy GLB sequence manifest format mismatch.")
+    assert_condition(choppy_glb_sequence_header[:4] == b"glTF", "Choppy GLB sequence first frame magic header mismatch.")
+    assert_condition(int.from_bytes(choppy_glb_sequence_header[4:8], "little") == 2, "Choppy GLB sequence first frame version mismatch.")
     print(f"Validated spectral choppy OBJ mesh export: {choppy_mesh_path}")
 
     spectral_benchmark = benchmark_spectral_size(

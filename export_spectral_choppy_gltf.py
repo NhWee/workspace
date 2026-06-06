@@ -302,10 +302,50 @@ def write_gltf_sequence(
     }
 
 
+def write_glb_sequence(
+    output_dir: Path,
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    foam_threshold: float,
+    max_foam_points: int,
+    foam_z_offset: float,
+) -> dict:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    frame_summaries = []
+    for index, (x_grid, y_grid, z_grid) in enumerate(frames):
+        frame_path = output_dir / f"frame_{index:04d}.glb"
+        frame_summaries.append(
+            write_glb_scene(
+                frame_path,
+                x_grid,
+                y_grid,
+                z_grid,
+                foam_threshold=foam_threshold,
+                max_foam_points=max_foam_points,
+                foam_z_offset=foam_z_offset,
+            )
+        )
+
+    manifest = {
+        "exporter": "export_spectral_choppy_gltf.py",
+        "format": "glb_sequence",
+        "frame_count": len(frame_summaries),
+        "frames": frame_summaries,
+    }
+    manifest_path = output_dir / "sequence_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return {
+        "directory": str(output_dir),
+        "manifest_path": str(manifest_path),
+        "frame_count": len(frame_summaries),
+        "frames": frame_summaries,
+    }
+
+
 def export_final_choppy_gltf(
     output: Path,
     glb_output: Path | None,
     sequence_output_dir: Path | None,
+    glb_sequence_output_dir: Path | None,
     size: int,
     steps: int,
     frame_every: int,
@@ -381,7 +421,23 @@ def export_final_choppy_gltf(
         if sequence_output_dir is not None
         else None
     )
-    return {"final": final_summary, "glb": glb_summary, "sequence": sequence_summary}
+    glb_sequence_summary = (
+        write_glb_sequence(
+            glb_sequence_output_dir,
+            frames,
+            foam_threshold=foam_threshold,
+            max_foam_points=max_foam_points,
+            foam_z_offset=foam_z_offset,
+        )
+        if glb_sequence_output_dir is not None
+        else None
+    )
+    return {
+        "final": final_summary,
+        "glb": glb_summary,
+        "sequence": sequence_summary,
+        "glb_sequence": glb_sequence_summary,
+    }
 
 
 def parse_args() -> argparse.Namespace:
@@ -407,6 +463,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=Path("outputs/spectral_choppy_wave_final.gltf"), help="Output glTF path.")
     parser.add_argument("--glb-output", type=Path, default=None, help="Optional output binary GLB path for the final frame.")
     parser.add_argument("--sequence-output-dir", type=Path, default=None, help="Optional directory for glTF files for every saved frame.")
+    parser.add_argument("--glb-sequence-output-dir", type=Path, default=None, help="Optional directory for GLB files for every saved frame.")
     return parser.parse_args()
 
 
@@ -421,6 +478,7 @@ def main() -> None:
         output=args.output,
         glb_output=args.glb_output,
         sequence_output_dir=args.sequence_output_dir,
+        glb_sequence_output_dir=args.glb_sequence_output_dir,
         size=args.size,
         steps=args.steps,
         frame_every=args.frame_every,
@@ -452,6 +510,10 @@ def main() -> None:
         print(f"Saved glTF sequence: {summary['sequence']['directory']}")
         print(f"Sequence frames: {summary['sequence']['frame_count']}")
         print(f"Saved sequence manifest: {summary['sequence']['manifest_path']}")
+    if summary["glb_sequence"] is not None:
+        print(f"Saved GLB sequence: {summary['glb_sequence']['directory']}")
+        print(f"GLB sequence frames: {summary['glb_sequence']['frame_count']}")
+        print(f"Saved GLB sequence manifest: {summary['glb_sequence']['manifest_path']}")
 
 
 if __name__ == "__main__":
