@@ -1,3 +1,6 @@
+# Shallow water wave simulation with variable bathymetry in 2D using PyTorch for GPU acceleration, rendered in 3D.
+# You can handle the parameters
+# size, steps, frame_every, gravity, dt, damping, fps
 import argparse
 from pathlib import Path
 
