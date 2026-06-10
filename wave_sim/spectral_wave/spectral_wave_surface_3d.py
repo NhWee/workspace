@@ -1,5 +1,16 @@
+# GPU FFT spectral wave surface simulation.
+# eta(x, y, t) = IFFT[A(kx, ky) * exp(i * omega(k) * t)]
+# omega(k) = sqrt(g * |k|)
+# You can handle the parameters
+# size, steps, frame_every, domain_size, gravity, dt, wave_amplitude,
+# peak_wavelength, bandwidth, wind_direction_degrees, directional_spread,
+# damping, seed, store_velocity, max_surface_points, output, viewer_output
 import argparse
 from pathlib import Path
+import sys
+
+if __package__ is None or __package__ == "":
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import torch
 
