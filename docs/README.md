@@ -2,6 +2,9 @@
 
 Guide files are grouped by workflow section.
 
+Python files are grouped the same way under `wave_sim/`. Run scripts from the
+repository root with `python -m wave_sim.<section>.<module>`.
+
 ## 01 Shallow Water
 
 - `shallow_water_2d_guide.txt`

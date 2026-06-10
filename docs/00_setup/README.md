@@ -10,6 +10,6 @@ Main files:
 Basic check:
 
 ```powershell
-.\.venv\Scripts\python.exe gpu_smoke_test.py
+.\.venv\Scripts\python.exe -m wave_sim.setup.gpu_smoke_test
 .\.venv\Scripts\python.exe -m pip check
 ```
