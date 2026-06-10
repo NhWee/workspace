@@ -1,3 +1,7 @@
+# Shallow water wave simulation in 2D using PyTorch for GPU acceleration.
+# d²h/dt² = c² ∇²h
+# You can handle the parameters
+# size, steps, frame_every, wave_speed, dt, damping, fps
 import argparse
 from pathlib import Path
 
