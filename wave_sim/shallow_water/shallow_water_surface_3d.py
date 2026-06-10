@@ -1,5 +1,9 @@
 import argparse
 from pathlib import Path
+import sys
+
+if __package__ is None or __package__ == "":
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -110,14 +114,14 @@ def save_3d_outputs(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render the GPU height-field wave simulation as a 3D surface.")
     parser.add_argument("--size", type=int, default=256, help="Simulation grid size.")
-    parser.add_argument("--steps", type=int, default=420, help="Simulation steps.")
+    parser.add_argument("--steps", type=int, default=1080, help="Simulation steps.")
     parser.add_argument("--frame-every", type=int, default=7, help="Save one render frame every N simulation steps.")
     parser.add_argument("--wave-speed", type=float, default=0.42, help="Wave speed coefficient.")
     parser.add_argument("--dt", type=float, default=0.9, help="Time step.")
     parser.add_argument("--damping", type=float, default=0.999, help="Global damping per step.")
     parser.add_argument("--fps", type=int, default=18, help="Output GIF frames per second.")
     parser.add_argument("--max-surface-points", type=int, default=128, help="Max rendered points per surface axis.")
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Output directory.")
+    parser.add_argument("--output-dir", type=Path, default=Path("outputs/shallow_water_2d"), help="Output directory.")
     return parser.parse_args()
 
 

@@ -3,6 +3,10 @@
 # size, steps, frame_every, gravity, dt, damping, fps
 import argparse
 from pathlib import Path
+import sys
+
+if __package__ is None or __package__ == "":
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import matplotlib.pyplot as plt
 import torch
