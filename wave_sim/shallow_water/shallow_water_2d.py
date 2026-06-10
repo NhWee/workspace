@@ -120,7 +120,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dt", type=float, default=0.9, help="Time step.")
     parser.add_argument("--damping", type=float, default=0.999, help="Global damping per step.")
     parser.add_argument("--fps", type=int, default=24, help="Output GIF frames per second.")
-    parser.add_argument("--output-dir", type=Path, default=Path("outputs"), help="Output directory.")
+    parser.add_argument("--output-dir", type=Path, default=Path("outputs/shallow_water_2d"), help="Output directory.")
     return parser.parse_args()
 
 
