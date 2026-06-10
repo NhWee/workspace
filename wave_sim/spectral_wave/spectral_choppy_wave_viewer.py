@@ -1,5 +1,20 @@
+# GPU FFT choppy wave surface simulation.
+# eta(x, y, t) = IFFT[A(kx, ky) * exp(i * omega(k) * t)]
+# omega(k) = sqrt(g * |k|)
+# x' = x + IFFT[-i * kx / |k| * eta_spectrum] * choppiness
+# y' = y + IFFT[-i * ky / |k| * eta_spectrum] * choppiness
+# foam markers use steepness = sqrt((d eta / dx)^2 + (d eta / dy)^2)
+# You can handle the parameters
+# size, steps, frame_every, domain_size, gravity, dt, wave_amplitude,
+# peak_wavelength, bandwidth, wind_direction_degrees, directional_spread,
+# damping, seed, choppiness, hide_foam, foam_threshold, max_foam_points,
+# max_surface_points, output
 import argparse
 from pathlib import Path
+import sys
+
+if __package__ is None or __package__ == "":
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 import numpy as np
 import plotly.graph_objects as go
