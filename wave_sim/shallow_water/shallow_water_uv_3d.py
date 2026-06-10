@@ -1,3 +1,7 @@
+# Shallow water wave simulation considering velocity fields (u/v) in 2D using PyTorch for GPU acceleration, rendered in 3D.
+# Linear Shallow Water Equations
+# You can handle the parameters
+# size, steps, frame_every, mean_depth, gravity, dt, damping, fps
 import argparse
 from pathlib import Path
 
