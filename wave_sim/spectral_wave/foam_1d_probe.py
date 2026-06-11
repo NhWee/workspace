@@ -10,6 +10,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.animation import FuncAnimation, PillowWriter
 
 
 def smoothstep(x: np.ndarray) -> np.ndarray:
@@ -130,6 +131,51 @@ def save_probe_plot(
     print(f"Saved heatmap: {heatmap_path}")
 
 
+def save_probe_animation(
+    x: np.ndarray,
+    eta_frames: list[np.ndarray],
+    foam_frames: list[np.ndarray],
+    source_frames: list[np.ndarray],
+    output_dir: Path,
+    fps: int,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    animation_path = output_dir / "foam_1d_probe.gif"
+    eta_min = min(float(np.min(eta)) for eta in eta_frames)
+    eta_max = max(float(np.max(eta)) for eta in eta_frames)
+    eta_range = max(eta_max - eta_min, 1.0e-6)
+    foam_band = 0.12 * eta_range
+
+    fig, ax = plt.subplots(figsize=(11, 4), dpi=130)
+    (eta_line,) = ax.plot([], [], color="#155e75", linewidth=2.0, label="eta")
+    (source_line,) = ax.plot([], [], color="#f97316", linewidth=1.0, alpha=0.8, label="foam source")
+    foam_fill = [None]
+
+    ax.set_xlim(float(x.min()), float(x.max()))
+    ax.set_ylim(eta_min - 0.15 * eta_range, eta_max + 0.35 * eta_range)
+    ax.set_xlabel("x")
+    ax.set_ylabel("eta")
+    ax.grid(alpha=0.25)
+    ax.legend(loc="upper right")
+
+    def update(frame_index: int):
+        eta = eta_frames[frame_index]
+        foam = foam_frames[frame_index]
+        source = source_frames[frame_index]
+        eta_line.set_data(x, eta)
+        source_line.set_data(x, eta + source * foam_band * 1.25)
+        if foam_fill[0] is not None:
+            foam_fill[0].remove()
+        foam_fill[0] = ax.fill_between(x, eta, eta + foam * foam_band, color="#e0f2fe", alpha=0.95)
+        ax.set_title(f"1D eta foam simulation | frame {frame_index + 1}/{len(eta_frames)}")
+        return eta_line, source_line, foam_fill[0]
+
+    animation = FuncAnimation(fig, update, frames=len(eta_frames), blit=False)
+    animation.save(animation_path, writer=PillowWriter(fps=fps))
+    plt.close(fig)
+    print(f"Saved animation: {animation_path}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Probe foam generation on a 1D eta wave.")
     parser.add_argument("--points", type=int, default=512, help="Number of 1D samples.")
@@ -144,6 +190,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--foam-softness", type=float, default=1.2, help="Soft transition width for foam source.")
     parser.add_argument("--crest-bias", type=float, default=0.85, help="Lower values restrict foam more strongly to crests.")
     parser.add_argument("--foam-decay", type=float, default=0.88, help="How much foam remains between frames.")
+    parser.add_argument("--fps", type=int, default=18, help="Output GIF frames per second.")
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/foam_1d_probe"), help="Output directory.")
     return parser.parse_args()
 
@@ -170,6 +217,7 @@ def main() -> None:
         foam_decay=args.foam_decay,
     )
     save_probe_plot(x, eta_frames, foam_frames, source_frames, slope_frames, crest_weight_frames, args.output_dir)
+    save_probe_animation(x, eta_frames, foam_frames, source_frames, args.output_dir, args.fps)
 
 
 if __name__ == "__main__":
