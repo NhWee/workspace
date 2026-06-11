@@ -3,12 +3,14 @@
 # omega(k) = sqrt(g * |k|)
 # x' = x + IFFT[-i * kx / |k| * eta_spectrum] * choppiness
 # y' = y + IFFT[-i * ky / |k| * eta_spectrum] * choppiness
-# foam overlay/markers use steepness = sqrt((d eta / dx)^2 + (d eta / dy)^2)
+# foam source = steepness_source * crest_weight
+# steepness = sqrt((d eta / dx)^2 + (d eta / dy)^2)
 # You can handle the parameters
 # size, steps, frame_every, domain_size, gravity, dt, wave_amplitude,
 # peak_wavelength, bandwidth, wind_direction_degrees, directional_spread,
 # damping, seed, choppiness, foam_mode, hide_foam, foam_threshold,
-# foam_softness, foam_decay, max_foam_points, max_surface_points, output
+# foam_softness, foam_crest_bias, foam_decay, max_foam_points,
+# max_surface_points, output
 import argparse
 from pathlib import Path
 import sys
@@ -97,25 +99,38 @@ def simulate_choppy_frames(
     return frames
 
 
-def foam_intensity(z_grid: np.ndarray, foam_threshold: float, foam_softness: float) -> np.ndarray:
+def smoothstep(array: np.ndarray) -> np.ndarray:
+    array = np.clip(array, 0.0, 1.0)
+    return array * array * (3.0 - 2.0 * array)
+
+
+def foam_intensity(
+    z_grid: np.ndarray,
+    foam_threshold: float,
+    foam_softness: float,
+    foam_crest_bias: float,
+) -> np.ndarray:
     gradient_y, gradient_x = np.gradient(z_grid)
     steepness = np.sqrt(gradient_x * gradient_x + gradient_y * gradient_y)
     transition = max(foam_threshold * foam_softness, 1.0e-6)
-    intensity = np.clip((steepness - foam_threshold) / transition, 0.0, 1.0)
-    return intensity * intensity * (3.0 - 2.0 * intensity)
+    steepness_source = smoothstep((steepness - foam_threshold) / transition)
+    eta_std = max(float(np.std(z_grid)), 1.0e-6)
+    crest_weight = smoothstep((z_grid - float(np.mean(z_grid))) / (eta_std * max(foam_crest_bias, 1.0e-6)))
+    return steepness_source * crest_weight
 
 
 def persistent_foam_maps(
     frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
     foam_threshold: float,
     foam_softness: float,
+    foam_crest_bias: float,
     foam_decay: float,
 ) -> list[np.ndarray]:
     foam_maps = []
     previous = None
     decay = float(np.clip(foam_decay, 0.0, 1.0))
     for _, _, z_grid in frames:
-        current = foam_intensity(z_grid, foam_threshold, foam_softness)
+        current = foam_intensity(z_grid, foam_threshold, foam_softness, foam_crest_bias)
         if previous is None:
             foam = current
         else:
@@ -133,6 +148,7 @@ def make_surface_trace(
     foam_mode: str,
     foam_threshold: float,
     foam_softness: float,
+    foam_crest_bias: float,
     foam_map: np.ndarray | None = None,
 ) -> go.Surface:
     surface_color = z_grid
@@ -142,7 +158,7 @@ def make_surface_trace(
         eta_min = float(np.min(z_grid))
         eta_range = max(float(np.max(z_grid) - eta_min), 1.0e-6)
         eta_normalized = (z_grid - eta_min) / eta_range
-        foam = foam_map if foam_map is not None else foam_intensity(z_grid, foam_threshold, foam_softness)
+        foam = foam_map if foam_map is not None else foam_intensity(z_grid, foam_threshold, foam_softness, foam_crest_bias)
         surface_color = np.clip(0.72 * eta_normalized + 0.55 * foam, 0.0, 1.0)
         colorscale = [
             [0.0, "#0b3d6e"],
@@ -173,11 +189,15 @@ def sample_foam_points(
     y_grid: np.ndarray,
     z_grid: np.ndarray,
     foam_threshold: float,
+    foam_crest_bias: float,
     max_foam_points: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     gradient_y, gradient_x = np.gradient(z_grid)
     steepness = np.sqrt(gradient_x * gradient_x + gradient_y * gradient_y)
-    mask = steepness >= foam_threshold
+    eta_std = max(float(np.std(z_grid)), 1.0e-6)
+    crest_weight = smoothstep((z_grid - float(np.mean(z_grid))) / (eta_std * max(foam_crest_bias, 1.0e-6)))
+    foam_score = steepness * crest_weight
+    mask = foam_score >= foam_threshold
     if not np.any(mask):
         empty = np.array([], dtype=np.float32)
         return empty, empty, empty, empty
@@ -185,7 +205,7 @@ def sample_foam_points(
     foam_x = x_grid[mask]
     foam_y = y_grid[mask]
     foam_z = z_grid[mask]
-    foam_steepness = steepness[mask]
+    foam_steepness = foam_score[mask]
     if len(foam_x) > max_foam_points:
         order = np.argsort(foam_steepness)[-max_foam_points:]
         foam_x = foam_x[order]
@@ -200,6 +220,7 @@ def make_foam_trace(
     y_grid: np.ndarray,
     z_grid: np.ndarray,
     foam_threshold: float,
+    foam_crest_bias: float,
     max_foam_points: int,
 ) -> go.Scatter3d:
     foam_x, foam_y, foam_z, foam_steepness = sample_foam_points(
@@ -207,6 +228,7 @@ def make_foam_trace(
         y_grid,
         z_grid,
         foam_threshold,
+        foam_crest_bias,
         max_foam_points,
     )
     return go.Scatter3d(
@@ -232,13 +254,14 @@ def build_choppy_figure(
     foam_mode: str = "overlay",
     foam_threshold: float = 0.018,
     foam_softness: float = 1.5,
+    foam_crest_bias: float = 0.85,
     foam_decay: float = 0.82,
     max_foam_points: int = 900,
 ) -> go.Figure:
     z_limit = max(float(np.max(np.abs(z))) for _, _, z in frames)
     z_limit = max(z_limit * 1.4, 0.08)
     half_domain = 0.55 * domain_size
-    foam_maps = persistent_foam_maps(frames, foam_threshold, foam_softness, foam_decay)
+    foam_maps = persistent_foam_maps(frames, foam_threshold, foam_softness, foam_crest_bias, foam_decay)
 
     def frame_traces(x: np.ndarray, y: np.ndarray, z: np.ndarray, showscale: bool, frame_index: int) -> list:
         traces = [
@@ -250,11 +273,12 @@ def build_choppy_figure(
                 foam_mode,
                 foam_threshold,
                 foam_softness,
+                foam_crest_bias,
                 foam_maps[frame_index],
             )
         ]
         if foam_mode in ("markers", "both"):
-            traces.append(make_foam_trace(x, y, z, foam_threshold, max_foam_points))
+            traces.append(make_foam_trace(x, y, z, foam_threshold, foam_crest_bias, max_foam_points))
         return traces
 
     figure_frames = [
@@ -341,6 +365,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hide-foam", action="store_true", help="Disable foam visualization.")
     parser.add_argument("--foam-threshold", type=float, default=0.035, help="Minimum downsampled eta steepness for foam.")
     parser.add_argument("--foam-softness", type=float, default=1.5, help="Soft transition width for foam overlay.")
+    parser.add_argument("--foam-crest-bias", type=float, default=0.85, help="Lower values restrict foam more strongly to wave crests.")
     parser.add_argument("--foam-decay", type=float, default=0.82, help="How much overlay foam remains between frames.")
     parser.add_argument("--max-foam-points", type=int, default=250, help="Maximum foam markers per frame.")
     parser.add_argument("--max-surface-points", type=int, default=192, help="Max rendered points per surface axis.")
@@ -379,6 +404,7 @@ def main() -> None:
         foam_mode="off" if args.hide_foam else args.foam_mode,
         foam_threshold=args.foam_threshold,
         foam_softness=args.foam_softness,
+        foam_crest_bias=args.foam_crest_bias,
         foam_decay=args.foam_decay,
         max_foam_points=args.max_foam_points,
     )
