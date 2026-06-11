@@ -3,12 +3,12 @@
 # omega(k) = sqrt(g * |k|)
 # x' = x + IFFT[-i * kx / |k| * eta_spectrum] * choppiness
 # y' = y + IFFT[-i * ky / |k| * eta_spectrum] * choppiness
-# foam markers use steepness = sqrt((d eta / dx)^2 + (d eta / dy)^2)
+# foam overlay/markers use steepness = sqrt((d eta / dx)^2 + (d eta / dy)^2)
 # You can handle the parameters
 # size, steps, frame_every, domain_size, gravity, dt, wave_amplitude,
 # peak_wavelength, bandwidth, wind_direction_degrees, directional_spread,
-# damping, seed, choppiness, hide_foam, foam_threshold, max_foam_points,
-# max_surface_points, output
+# damping, seed, choppiness, foam_mode, hide_foam, foam_threshold,
+# foam_softness, max_foam_points, max_surface_points, output
 import argparse
 from pathlib import Path
 import sys
@@ -97,16 +97,50 @@ def simulate_choppy_frames(
     return frames
 
 
-def make_surface_trace(x_grid: np.ndarray, y_grid: np.ndarray, z_grid: np.ndarray, showscale: bool) -> go.Surface:
+def foam_intensity(z_grid: np.ndarray, foam_threshold: float, foam_softness: float) -> np.ndarray:
+    gradient_y, gradient_x = np.gradient(z_grid)
+    steepness = np.sqrt(gradient_x * gradient_x + gradient_y * gradient_y)
+    transition = max(foam_threshold * foam_softness, 1.0e-6)
+    intensity = np.clip((steepness - foam_threshold) / transition, 0.0, 1.0)
+    return intensity * intensity * (3.0 - 2.0 * intensity)
+
+
+def make_surface_trace(
+    x_grid: np.ndarray,
+    y_grid: np.ndarray,
+    z_grid: np.ndarray,
+    showscale: bool,
+    foam_mode: str,
+    foam_threshold: float,
+    foam_softness: float,
+) -> go.Surface:
+    surface_color = z_grid
+    colorscale = "Blues"
+    colorbar = {"title": "eta"} if showscale else None
+    if foam_mode in ("overlay", "both"):
+        eta_min = float(np.min(z_grid))
+        eta_range = max(float(np.max(z_grid) - eta_min), 1.0e-6)
+        eta_normalized = (z_grid - eta_min) / eta_range
+        foam = foam_intensity(z_grid, foam_threshold, foam_softness)
+        surface_color = np.clip(0.72 * eta_normalized + 0.55 * foam, 0.0, 1.0)
+        colorscale = [
+            [0.0, "#0b3d6e"],
+            [0.35, "#1f78b4"],
+            [0.62, "#75b7dc"],
+            [0.82, "#d7edf7"],
+            [1.0, "#ffffff"],
+        ]
+        colorbar = {"title": "eta + foam"} if showscale else None
+
     return go.Surface(
         x=x_grid,
         y=y_grid,
         z=z_grid,
-        surfacecolor=z_grid,
-        colorscale="Blues",
+        surfacecolor=surface_color,
+        colorscale=colorscale,
         opacity=0.82,
         showscale=showscale,
-        colorbar={"title": "eta"} if showscale else None,
+        colorbar=colorbar,
         contours_z={"show": False},
         name="choppy water",
         hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>eta=%{z:.4f}<extra>choppy water</extra>",
@@ -174,8 +208,9 @@ def make_foam_trace(
 def build_choppy_figure(
     frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
     domain_size: float,
-    show_foam: bool = True,
+    foam_mode: str = "overlay",
     foam_threshold: float = 0.018,
+    foam_softness: float = 1.5,
     max_foam_points: int = 900,
 ) -> go.Figure:
     z_limit = max(float(np.max(np.abs(z))) for _, _, z in frames)
@@ -183,8 +218,8 @@ def build_choppy_figure(
     half_domain = 0.55 * domain_size
 
     def frame_traces(x: np.ndarray, y: np.ndarray, z: np.ndarray, showscale: bool) -> list:
-        traces = [make_surface_trace(x, y, z, showscale)]
-        if show_foam:
+        traces = [make_surface_trace(x, y, z, showscale, foam_mode, foam_threshold, foam_softness)]
+        if foam_mode in ("markers", "both"):
             traces.append(make_foam_trace(x, y, z, foam_threshold, max_foam_points))
         return traces
 
@@ -249,24 +284,31 @@ def build_choppy_figure(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create an interactive GPU FFT choppy wave surface viewer.")
-    parser.add_argument("--size", type=int, default=256, help="Simulation grid size.")
-    parser.add_argument("--steps", type=int, default=360, help="Simulation steps.")
-    parser.add_argument("--frame-every", type=int, default=12, help="Save one frame every N simulation steps.")
+    parser.add_argument("--size", type=int, default=512, help="Simulation grid size.")
+    parser.add_argument("--steps", type=int, default=1080, help="Simulation steps.")
+    parser.add_argument("--frame-every", type=int, default=4, help="Save one frame every N simulation steps.")
     parser.add_argument("--domain-size", type=float, default=8.0, help="Physical width of the periodic domain.")
     parser.add_argument("--gravity", type=float, default=9.81, help="Gravity coefficient.")
-    parser.add_argument("--dt", type=float, default=0.04, help="Time step.")
+    parser.add_argument("--dt", type=float, default=0.025, help="Time step.")
     parser.add_argument("--wave-amplitude", type=float, default=0.08, help="Target initial standard deviation of eta.")
-    parser.add_argument("--peak-wavelength", type=float, default=1.2, help="Dominant wavelength.")
-    parser.add_argument("--bandwidth", type=float, default=0.32, help="Relative spectral bandwidth around the peak.")
+    parser.add_argument("--peak-wavelength", type=float, default=1.8, help="Dominant wavelength.")
+    parser.add_argument("--bandwidth", type=float, default=0.18, help="Relative spectral bandwidth around the peak.")
     parser.add_argument("--wind-direction-degrees", type=float, default=25.0, help="Dominant propagation direction.")
-    parser.add_argument("--directional-spread", type=float, default=6.0, help="Higher values narrow the directional spectrum.")
+    parser.add_argument("--directional-spread", type=float, default=10.0, help="Higher values narrow the directional spectrum.")
     parser.add_argument("--damping", type=float, default=0.9995, help="Global spectral amplitude damping per step.")
     parser.add_argument("--seed", type=int, default=7, help="Random seed for the initial spectrum.")
     parser.add_argument("--choppiness", type=float, default=0.75, help="Horizontal displacement multiplier.")
-    parser.add_argument("--hide-foam", action="store_true", help="Disable steepness-based foam marker overlay.")
-    parser.add_argument("--foam-threshold", type=float, default=0.018, help="Minimum downsampled eta steepness for foam markers.")
-    parser.add_argument("--max-foam-points", type=int, default=900, help="Maximum foam markers per frame.")
-    parser.add_argument("--max-surface-points", type=int, default=96, help="Max rendered points per surface axis.")
+    parser.add_argument(
+        "--foam-mode",
+        choices=["overlay", "markers", "both", "off"],
+        default="overlay",
+        help="Foam visualization mode.",
+    )
+    parser.add_argument("--hide-foam", action="store_true", help="Disable foam visualization.")
+    parser.add_argument("--foam-threshold", type=float, default=0.035, help="Minimum downsampled eta steepness for foam.")
+    parser.add_argument("--foam-softness", type=float, default=1.5, help="Soft transition width for foam overlay.")
+    parser.add_argument("--max-foam-points", type=int, default=250, help="Maximum foam markers per frame.")
+    parser.add_argument("--max-surface-points", type=int, default=192, help="Max rendered points per surface axis.")
     parser.add_argument("--output", type=Path, default=Path("outputs/spectral_choppy_wave_viewer.html"), help="Output Plotly HTML path.")
     return parser.parse_args()
 
@@ -299,8 +341,9 @@ def main() -> None:
     fig = build_choppy_figure(
         frames,
         args.domain_size,
-        show_foam=not args.hide_foam,
+        foam_mode="off" if args.hide_foam else args.foam_mode,
         foam_threshold=args.foam_threshold,
+        foam_softness=args.foam_softness,
         max_foam_points=args.max_foam_points,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
