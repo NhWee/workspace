@@ -8,7 +8,7 @@
 # size, steps, frame_every, domain_size, gravity, dt, wave_amplitude,
 # peak_wavelength, bandwidth, wind_direction_degrees, directional_spread,
 # damping, seed, choppiness, foam_mode, hide_foam, foam_threshold,
-# foam_softness, max_foam_points, max_surface_points, output
+# foam_softness, foam_decay, max_foam_points, max_surface_points, output
 import argparse
 from pathlib import Path
 import sys
@@ -105,6 +105,26 @@ def foam_intensity(z_grid: np.ndarray, foam_threshold: float, foam_softness: flo
     return intensity * intensity * (3.0 - 2.0 * intensity)
 
 
+def persistent_foam_maps(
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    foam_threshold: float,
+    foam_softness: float,
+    foam_decay: float,
+) -> list[np.ndarray]:
+    foam_maps = []
+    previous = None
+    decay = float(np.clip(foam_decay, 0.0, 1.0))
+    for _, _, z_grid in frames:
+        current = foam_intensity(z_grid, foam_threshold, foam_softness)
+        if previous is None:
+            foam = current
+        else:
+            foam = np.maximum(previous * decay, current)
+        foam_maps.append(foam)
+        previous = foam
+    return foam_maps
+
+
 def make_surface_trace(
     x_grid: np.ndarray,
     y_grid: np.ndarray,
@@ -113,6 +133,7 @@ def make_surface_trace(
     foam_mode: str,
     foam_threshold: float,
     foam_softness: float,
+    foam_map: np.ndarray | None = None,
 ) -> go.Surface:
     surface_color = z_grid
     colorscale = "Blues"
@@ -121,7 +142,7 @@ def make_surface_trace(
         eta_min = float(np.min(z_grid))
         eta_range = max(float(np.max(z_grid) - eta_min), 1.0e-6)
         eta_normalized = (z_grid - eta_min) / eta_range
-        foam = foam_intensity(z_grid, foam_threshold, foam_softness)
+        foam = foam_map if foam_map is not None else foam_intensity(z_grid, foam_threshold, foam_softness)
         surface_color = np.clip(0.72 * eta_normalized + 0.55 * foam, 0.0, 1.0)
         colorscale = [
             [0.0, "#0b3d6e"],
@@ -211,21 +232,34 @@ def build_choppy_figure(
     foam_mode: str = "overlay",
     foam_threshold: float = 0.018,
     foam_softness: float = 1.5,
+    foam_decay: float = 0.82,
     max_foam_points: int = 900,
 ) -> go.Figure:
     z_limit = max(float(np.max(np.abs(z))) for _, _, z in frames)
     z_limit = max(z_limit * 1.4, 0.08)
     half_domain = 0.55 * domain_size
+    foam_maps = persistent_foam_maps(frames, foam_threshold, foam_softness, foam_decay)
 
-    def frame_traces(x: np.ndarray, y: np.ndarray, z: np.ndarray, showscale: bool) -> list:
-        traces = [make_surface_trace(x, y, z, showscale, foam_mode, foam_threshold, foam_softness)]
+    def frame_traces(x: np.ndarray, y: np.ndarray, z: np.ndarray, showscale: bool, frame_index: int) -> list:
+        traces = [
+            make_surface_trace(
+                x,
+                y,
+                z,
+                showscale,
+                foam_mode,
+                foam_threshold,
+                foam_softness,
+                foam_maps[frame_index],
+            )
+        ]
         if foam_mode in ("markers", "both"):
             traces.append(make_foam_trace(x, y, z, foam_threshold, max_foam_points))
         return traces
 
     figure_frames = [
         go.Frame(
-            data=frame_traces(x, y, z, True),
+            data=frame_traces(x, y, z, True, index),
             name=str(index),
         )
         for index, (x, y, z) in enumerate(frames)
@@ -239,7 +273,7 @@ def build_choppy_figure(
         for index in range(len(frames))
     ]
 
-    fig = go.Figure(data=frame_traces(*frames[0], showscale=True), frames=figure_frames)
+    fig = go.Figure(data=frame_traces(*frames[0], showscale=True, frame_index=0), frames=figure_frames)
     fig.update_layout(
         title="Interactive GPU FFT choppy wave surface",
         scene={
@@ -307,6 +341,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hide-foam", action="store_true", help="Disable foam visualization.")
     parser.add_argument("--foam-threshold", type=float, default=0.035, help="Minimum downsampled eta steepness for foam.")
     parser.add_argument("--foam-softness", type=float, default=1.5, help="Soft transition width for foam overlay.")
+    parser.add_argument("--foam-decay", type=float, default=0.82, help="How much overlay foam remains between frames.")
     parser.add_argument("--max-foam-points", type=int, default=250, help="Maximum foam markers per frame.")
     parser.add_argument("--max-surface-points", type=int, default=192, help="Max rendered points per surface axis.")
     parser.add_argument("--output", type=Path, default=Path("outputs/spectral_choppy_wave_viewer.html"), help="Output Plotly HTML path.")
@@ -344,6 +379,7 @@ def main() -> None:
         foam_mode="off" if args.hide_foam else args.foam_mode,
         foam_threshold=args.foam_threshold,
         foam_softness=args.foam_softness,
+        foam_decay=args.foam_decay,
         max_foam_points=args.max_foam_points,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
