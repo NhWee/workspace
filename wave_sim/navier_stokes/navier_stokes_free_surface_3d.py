@@ -27,7 +27,6 @@ from wave_sim.navier_stokes.navier_stokes_foam_2d import (
     add_vortex_forces,
     advect,
     curl_z,
-    initial_velocity,
     laplacian,
     make_grid,
     project_velocity,
@@ -90,10 +89,34 @@ def smooth_field(field: torch.Tensor, amount: float) -> torch.Tensor:
 
 def make_initial_eta(size: int, device: torch.device) -> torch.Tensor:
     xx, yy = make_grid(size, device)
-    ring_a = torch.exp(-((xx - 0.35) ** 2 + (yy - 0.48) ** 2) / 0.018)
-    ring_b = -0.75 * torch.exp(-((xx - 0.66) ** 2 + (yy - 0.54) ** 2) / 0.014)
-    ripple = 0.15 * torch.sin(8.0 * np.pi * xx + 3.0 * torch.sin(2.0 * np.pi * yy))
-    return 0.035 * (ring_a + ring_b + ripple)
+    crest_a = 1.25 * torch.exp(-((xx - 0.30) ** 2 + (yy - 0.44) ** 2) / 0.010)
+    trough_a = -1.05 * torch.exp(-((xx - 0.42) ** 2 + (yy - 0.56) ** 2) / 0.013)
+    crest_b = 0.95 * torch.exp(-((xx - 0.70) ** 2 + (yy - 0.57) ** 2) / 0.012)
+    trough_b = -0.85 * torch.exp(-((xx - 0.59) ** 2 + (yy - 0.43) ** 2) / 0.015)
+    crossing_ripples = 0.22 * torch.sin(10.0 * np.pi * xx + 2.5 * torch.sin(2.0 * np.pi * yy))
+    diagonal_ripples = 0.14 * torch.sin(7.0 * np.pi * (xx + yy))
+    return 0.045 * (crest_a + trough_a + crest_b + trough_b + crossing_ripples + diagonal_ripples)
+
+
+def make_initial_velocity(size: int, device: torch.device, strength: float, radius: float) -> tuple[torch.Tensor, torch.Tensor]:
+    xx, yy = make_grid(size, device)
+    u = torch.zeros((size, size), device=device)
+    v = torch.zeros((size, size), device=device)
+    vortices = [
+        (0.32, 0.46, 1.35),
+        (0.68, 0.54, -1.25),
+        (0.50, 0.32, 0.70),
+    ]
+    for cx, cy, spin in vortices:
+        dx = xx - cx
+        dy = yy - cy
+        r2 = dx * dx + dy * dy
+        weight = torch.exp(-r2 / max(radius * radius, 1.0e-6))
+        u = u + spin * (-dy) * weight * strength
+        v = v + spin * dx * weight * strength
+    shear = torch.exp(-((yy - 0.5) ** 2) / 0.05)
+    u = u + 0.28 * strength * shear * torch.sin(2.0 * np.pi * yy)
+    return u, v
 
 
 def update_surface(
@@ -202,6 +225,9 @@ def step_splash_particles(
     max_splash_particles: int,
     splash_life: float,
     splash_threshold: float,
+    splash_burst_min: float,
+    splash_burst_max: float,
+    splash_spread: float,
 ) -> SplashParticles:
     if len(particles.x) > 0:
         age = particles.age + dt
@@ -217,7 +243,7 @@ def step_splash_particles(
 
     spawn_count = max(0, int(np.ceil(splash_spawn_per_frame / max(frame_every, 1))))
     if spawn_count > 0 and len(particles.x) < max_splash_particles:
-        source = normalize01(torch.abs(vorticity)) * normalize01(speed) * torch.clamp(foam, 0.0, 1.0)
+        source = normalize01(torch.abs(vorticity)) * normalize01(speed) * torch.clamp(foam + 0.35, 0.0, 1.0)
         source = torch.flatten(torch.clamp(source - splash_threshold, min=0.0))
         source_sum = torch.sum(source)
         if float(source_sum.detach().cpu()) > 0.0:
@@ -229,16 +255,16 @@ def step_splash_particles(
             base_z = sample_field(eta, new_x, new_y)
             local_u = sample_field(u, new_x, new_y)
             local_v = sample_field(v, new_x, new_y)
-            burst = torch.empty(spawn_count, device=eta.device).uniform_(0.55, 1.0)
+            burst = torch.empty(spawn_count, device=eta.device).uniform_(splash_burst_min, splash_burst_max)
             new_life = torch.empty(spawn_count, device=eta.device).uniform_(0.65 * splash_life, 1.25 * splash_life)
             particles = SplashParticles(
                 torch.cat([particles.x, new_x]),
                 torch.cat([particles.y, new_y]),
-                torch.cat([particles.z, base_z + 0.012]),
+                torch.cat([particles.z, base_z + 0.018]),
                 torch.cat([particles.age, torch.zeros(spawn_count, device=eta.device)]),
                 torch.cat([particles.life, new_life]),
-                torch.cat([particles.vx, local_u * 0.35 + torch.empty(spawn_count, device=eta.device).uniform_(-0.035, 0.035)]),
-                torch.cat([particles.vy, local_v * 0.35 + torch.empty(spawn_count, device=eta.device).uniform_(-0.035, 0.035)]),
+                torch.cat([particles.vx, local_u * 0.45 + torch.empty(spawn_count, device=eta.device).uniform_(-splash_spread, splash_spread)]),
+                torch.cat([particles.vy, local_v * 0.45 + torch.empty(spawn_count, device=eta.device).uniform_(-splash_spread, splash_spread)]),
                 torch.cat([particles.vz, burst]),
             )
 
@@ -312,6 +338,60 @@ def vortex_marker_frame(
     )
 
 
+def vortex_spiral_frame(
+    eta: torch.Tensor,
+    vorticity: torch.Tensor,
+    speed: torch.Tensor,
+    eta_scale: float,
+    vortex_count: int,
+    points_per_vortex: int,
+    radius: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    if vortex_count <= 0 or points_per_vortex <= 0:
+        empty = np.empty(0, dtype=np.float32)
+        return empty, empty, empty, empty
+    score = torch.flatten(normalize01(torch.abs(vorticity)) * normalize01(speed))
+    values, indices = torch.topk(score, min(vortex_count, score.numel()))
+    keep = values > 0.58
+    if int(torch.sum(keep).detach().cpu()) == 0:
+        empty = np.empty(0, dtype=np.float32)
+        return empty, empty, empty, empty
+
+    values = values[keep]
+    indices = indices[keep]
+    size = eta.shape[0]
+    centers_y = (torch.div(indices, size, rounding_mode="floor").float() + 0.5) / size
+    centers_x = ((indices % size).float() + 0.5) / size
+    signs = torch.sign(torch.flatten(vorticity)[indices])
+
+    angles = torch.linspace(0.0, 2.5 * np.pi, points_per_vortex, device=eta.device)
+    radial = torch.linspace(0.18 * radius, radius, points_per_vortex, device=eta.device)
+    xs = []
+    ys = []
+    zs = []
+    strengths = []
+    for cx, cy, sign, strength in zip(centers_x, centers_y, signs, values):
+        theta = sign * angles
+        x = torch.remainder(cx + radial * torch.cos(theta), 1.0)
+        y = torch.remainder(cy + radial * torch.sin(theta), 1.0)
+        z = sample_field(eta, x, y) * eta_scale + 0.024
+        xs.append((x - 0.5).detach().cpu().numpy())
+        ys.append((y - 0.5).detach().cpu().numpy())
+        zs.append(z.detach().cpu().numpy())
+        strengths.append(torch.full_like(x, strength).detach().cpu().numpy())
+        xs.append(np.array([np.nan], dtype=np.float32))
+        ys.append(np.array([np.nan], dtype=np.float32))
+        zs.append(np.array([np.nan], dtype=np.float32))
+        strengths.append(np.array([np.nan], dtype=np.float32))
+
+    return (
+        np.concatenate(xs).astype(np.float32),
+        np.concatenate(ys).astype(np.float32),
+        np.concatenate(zs).astype(np.float32),
+        np.concatenate(strengths).astype(np.float32),
+    )
+
+
 def simulate_free_surface(
     size: int,
     steps: int,
@@ -342,14 +422,21 @@ def simulate_free_surface(
     splash_life: float,
     splash_gravity: float,
     splash_threshold: float,
+    splash_burst_min: float,
+    splash_burst_max: float,
+    splash_spread: float,
     vortex_markers: bool,
     max_vortex_markers: int,
+    vortex_spirals: bool,
+    vortex_spiral_count: int,
+    vortex_spiral_points: int,
+    vortex_spiral_radius: float,
     max_surface_points: int,
     device: torch.device,
-) -> list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]]:
+) -> list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]]:
     dx = 1.0 / size
     xx, yy = make_grid(size, device)
-    u, v = initial_velocity(size, device)
+    u, v = make_initial_velocity(size, device, force_strength, force_radius * 1.35)
     eta = make_initial_eta(size, device)
     eta_velocity = torch.zeros_like(eta)
     foam = torch.zeros_like(eta)
@@ -425,6 +512,9 @@ def simulate_free_surface(
                 max_splash_particles,
                 splash_life,
                 splash_threshold,
+                splash_burst_min,
+                splash_burst_max,
+                splash_spread,
             )
 
         if step % frame_every == 0:
@@ -440,6 +530,7 @@ def simulate_free_surface(
                 particle_frame(particles, eta, eta_scale, particle_height) if foam_particles else particle_frame(empty_particles(device), eta, eta_scale, particle_height),
                 splash_frame(splash, eta_scale) if splash_particles else splash_frame(empty_splash_particles(device), eta_scale),
                 vortex_marker_frame(xx, yy, eta, vorticity, speed, eta_scale, max_vortex_markers) if vortex_markers else vortex_marker_frame(xx, yy, eta, vorticity, speed, eta_scale, 0),
+                vortex_spiral_frame(eta, vorticity, speed, eta_scale, vortex_spiral_count, vortex_spiral_points, vortex_spiral_radius) if vortex_spirals else vortex_spiral_frame(eta, vorticity, speed, eta_scale, 0, 0, vortex_spiral_radius),
             ))
 
     return frames
@@ -543,21 +634,44 @@ def make_vortex_trace(
     )
 
 
+def make_vortex_spiral_trace(
+    spiral: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    line_width: float,
+) -> go.Scatter3d:
+    x, y, z, strength = spiral
+    return go.Scatter3d(
+        x=x,
+        y=y,
+        z=z,
+        mode="lines",
+        line={
+            "width": line_width,
+            "color": strength,
+            "colorscale": [[0.0, "#22d3ee"], [0.5, "#fef08a"], [1.0, "#fb7185"]],
+        },
+        opacity=0.82,
+        name="vortex spirals",
+        hoverinfo="skip",
+    )
+
+
 def build_figure(
-    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]],
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]],
     frame_duration_ms: int,
     particle_size: float,
     splash_size: float,
     vortex_size: float,
+    vortex_line_width: float,
 ) -> go.Figure:
-    z_limit = max(float(np.max(np.abs(z))) for _, _, z, _, _, _, _ in frames)
+    z_limit = max(float(np.max(np.abs(z))) for _, _, z, _, _, _, _, _ in frames)
     z_limit = max(z_limit * 1.25, 0.02)
-    first_x, first_y, first_z, first_foam, first_particles, first_splash, first_vortex = frames[0]
+    first_x, first_y, first_z, first_foam, first_particles, first_splash, first_vortex, first_spiral = frames[0]
     fig = go.Figure(data=[
         make_surface_trace(first_x, first_y, first_z, first_foam, z_limit, True),
         make_particle_trace(first_particles, particle_size),
         make_splash_trace(first_splash, splash_size),
         make_vortex_trace(first_vortex, vortex_size),
+        make_vortex_spiral_trace(first_spiral, vortex_line_width),
     ])
     fig.frames = [
         go.Frame(
@@ -566,10 +680,11 @@ def build_figure(
                 make_particle_trace(particles, particle_size),
                 make_splash_trace(splash, splash_size),
                 make_vortex_trace(vortex, vortex_size),
+                make_vortex_spiral_trace(spiral, vortex_line_width),
             ],
             name=str(index),
         )
-        for index, (x, y, z, foam, particles, splash, vortex) in enumerate(frames)
+        for index, (x, y, z, foam, particles, splash, vortex, spiral) in enumerate(frames)
     ]
     frame_names = [frame.name for frame in fig.frames]
     animation_options = {
@@ -691,10 +806,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--splash-life", type=float, default=0.42, help="Average splash particle lifetime.")
     parser.add_argument("--splash-gravity", type=float, default=2.8, help="Downward acceleration applied to splash particles.")
     parser.add_argument("--splash-threshold", type=float, default=0.16, help="Minimum energetic source value for splash emission.")
+    parser.add_argument("--splash-burst-min", type=float, default=0.80, help="Minimum upward splash velocity.")
+    parser.add_argument("--splash-burst-max", type=float, default=1.45, help="Maximum upward splash velocity.")
+    parser.add_argument("--splash-spread", type=float, default=0.065, help="Horizontal random spread for splash particles.")
     parser.add_argument("--splash-size", type=float, default=0.8, help="Rendered splash particle size scale.")
     parser.add_argument("--vortex-markers", action=argparse.BooleanOptionalAction, default=True, help="Render markers on high-vorticity regions.")
     parser.add_argument("--max-vortex-markers", type=int, default=90, help="Maximum vortex markers per frame.")
     parser.add_argument("--vortex-size", type=float, default=0.75, help="Rendered vortex marker size scale.")
+    parser.add_argument("--vortex-spirals", action=argparse.BooleanOptionalAction, default=True, help="Render spiral lines over high-vorticity regions.")
+    parser.add_argument("--vortex-spiral-count", type=int, default=4, help="Number of visible vortex spirals.")
+    parser.add_argument("--vortex-spiral-points", type=int, default=48, help="Points per vortex spiral.")
+    parser.add_argument("--vortex-spiral-radius", type=float, default=0.105, help="Radius of each rendered vortex spiral.")
+    parser.add_argument("--vortex-line-width", type=float, default=6.0, help="Rendered vortex spiral line width.")
     parser.add_argument("--max-surface-points", type=int, default=128, help="Max rendered points per surface axis.")
     parser.add_argument("--fps", type=float, default=None, help="Viewer playback FPS. Overrides --frame-duration-ms when set.")
     parser.add_argument("--frame-duration-ms", type=int, default=30, help="Animation frame duration in milliseconds.")
@@ -712,6 +835,7 @@ def apply_quality_preset(args: argparse.Namespace) -> None:
         args.max_particles = min(args.max_particles, 700)
         args.max_splash_particles = min(args.max_splash_particles, 180)
         args.max_vortex_markers = min(args.max_vortex_markers, 45)
+        args.vortex_spiral_points = min(args.vortex_spiral_points, 32)
     elif args.quality == "final":
         args.frame_every = min(args.frame_every, 2)
         args.pressure_iters = max(args.pressure_iters, 80)
@@ -719,6 +843,7 @@ def apply_quality_preset(args: argparse.Namespace) -> None:
         args.max_particles = max(args.max_particles, 2400)
         args.max_splash_particles = max(args.max_splash_particles, 650)
         args.max_vortex_markers = max(args.max_vortex_markers, 120)
+        args.vortex_spiral_points = max(args.vortex_spiral_points, 64)
 
 
 def main() -> None:
@@ -759,8 +884,15 @@ def main() -> None:
         splash_life=args.splash_life,
         splash_gravity=args.splash_gravity,
         splash_threshold=args.splash_threshold,
+        splash_burst_min=args.splash_burst_min,
+        splash_burst_max=args.splash_burst_max,
+        splash_spread=args.splash_spread,
         vortex_markers=args.vortex_markers,
         max_vortex_markers=args.max_vortex_markers,
+        vortex_spirals=args.vortex_spirals,
+        vortex_spiral_count=args.vortex_spiral_count,
+        vortex_spiral_points=args.vortex_spiral_points,
+        vortex_spiral_radius=args.vortex_spiral_radius,
         max_surface_points=args.max_surface_points,
         device=device,
     )
@@ -768,7 +900,7 @@ def main() -> None:
     if args.fps is not None:
         frame_duration_ms = max(1, int(round(1000.0 / max(args.fps, 1.0e-6))))
 
-    fig = build_figure(frames, frame_duration_ms, args.particle_size, args.splash_size, args.vortex_size)
+    fig = build_figure(frames, frame_duration_ms, args.particle_size, args.splash_size, args.vortex_size, args.vortex_line_width)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(args.output, include_plotlyjs=True, full_html=True)
     print(f"Saved Navier-Stokes free-surface viewer: {args.output}")

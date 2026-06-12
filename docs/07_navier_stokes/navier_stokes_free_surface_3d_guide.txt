@@ -141,6 +141,12 @@ Downward acceleration applied to splash particles.
 --splash-threshold
 Minimum energetic source value before splash appears.
 
+--splash-burst-min / --splash-burst-max
+Minimum and maximum upward velocity for newly emitted splash particles.
+
+--splash-spread
+Horizontal random spread for splash particles.
+
 --splash-size
 Rendered splash particle size scale.
 
@@ -152,6 +158,22 @@ Maximum vortex markers per frame.
 
 --vortex-size
 Rendered vortex marker size scale.
+
+--vortex-spirals / --no-vortex-spirals
+Turns visible spiral line overlays on or off. Spiral lines make the main
+vortices easier to see than marker points alone.
+
+--vortex-spiral-count
+Number of visible vortex spirals.
+
+--vortex-spiral-points
+Points per rendered spiral.
+
+--vortex-spiral-radius
+Radius of each rendered vortex spiral.
+
+--vortex-line-width
+Rendered line width for vortex spirals.
 
 --quality
 Output preset. preview is faster and lighter, balanced is the default, and
@@ -201,6 +223,10 @@ python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --wave-s
 More splash and visible vortex markers:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --size 64 --steps 720 --frame-every 2 --max-surface-points 64 --particle-spawn-per-frame 25 --splash-spawn-per-frame 18 --max-splash-particles 500 --max-vortex-markers 80
+
+More dynamic initial flow, stronger splash, and visible vortex spirals:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --size 64 --steps 720 --frame-every 2 --pressure-iters 18 --max-surface-points 64 --force-strength 5.8 --force-radius 0.15 --wave-speed 0.12 --surface-coupling 0.48 --surface-damping 1.05 --surface-smoothing 0.10 --particle-spawn-per-frame 28 --splash-spawn-per-frame 28 --max-splash-particles 650 --splash-burst-max 1.8 --splash-spread 0.085 --vortex-spiral-count 5 --vortex-spiral-radius 0.13 --vortex-line-width 7
 
 How this connects to the final goal
 -----------------------------------
