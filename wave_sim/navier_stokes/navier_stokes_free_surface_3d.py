@@ -7,7 +7,7 @@
 # size, steps, frame_every, dt, viscosity, pressure_iters, force_strength,
 # force_radius, wave_speed, surface_coupling, surface_damping, eta_scale,
 # foam_vorticity_threshold, foam_speed_threshold, foam_birth, foam_decay,
-# max_surface_points, frame_duration_ms, output
+# max_surface_points, fps, frame_duration_ms, output
 import argparse
 from pathlib import Path
 import sys
@@ -266,6 +266,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--foam-birth", type=float, default=2.2, help="Foam generation rate.")
     parser.add_argument("--foam-decay", type=float, default=0.48, help="Foam fade-out rate.")
     parser.add_argument("--max-surface-points", type=int, default=128, help="Max rendered points per surface axis.")
+    parser.add_argument("--fps", type=float, default=None, help="Viewer playback FPS. Overrides --frame-duration-ms when set.")
     parser.add_argument("--frame-duration-ms", type=int, default=30, help="Animation frame duration in milliseconds.")
     parser.add_argument("--output", type=Path, default=Path("outputs/navier_stokes_free_surface_3d.html"), help="Output Plotly HTML path.")
     return parser.parse_args()
@@ -298,7 +299,11 @@ def main() -> None:
         max_surface_points=args.max_surface_points,
         device=device,
     )
-    fig = build_figure(frames, args.frame_duration_ms)
+    frame_duration_ms = args.frame_duration_ms
+    if args.fps is not None:
+        frame_duration_ms = max(1, int(round(1000.0 / max(args.fps, 1.0e-6))))
+
+    fig = build_figure(frames, frame_duration_ms)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(args.output, include_plotlyjs=True, full_html=True)
     print(f"Saved Navier-Stokes free-surface viewer: {args.output}")

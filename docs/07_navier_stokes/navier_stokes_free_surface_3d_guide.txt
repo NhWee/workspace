@@ -96,6 +96,13 @@ How quickly foam is created.
 --foam-decay
 How quickly foam fades.
 
+--fps
+Viewer playback FPS. If this is provided, it overrides --frame-duration-ms.
+
+--frame-duration-ms
+Viewer frame duration in milliseconds. Lower values play faster. Higher values
+play slower and make fast fluctuation easier to inspect.
+
 Example
 -------
 From the project root:
@@ -105,6 +112,10 @@ python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d
 Smoother output:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --frame-every 2 --frame-duration-ms 25
+
+Slower playback for checking fast fluctuation:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24
 
 More energetic surface:
 
