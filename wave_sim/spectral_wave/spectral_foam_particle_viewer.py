@@ -7,7 +7,7 @@
 # peak_wavelength, bandwidth, wind_direction_degrees, directional_spread,
 # damping, seed, choppiness, foam_threshold, foam_softness, foam_crest_bias,
 # particle_life, particle_drift, particle_spread, max_particles,
-# spawn_per_frame, max_surface_points, output
+# spawn_per_frame, trail_length, frame_duration_ms, max_surface_points, output
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
@@ -196,7 +196,12 @@ def simulate_foam_particles(
     return particle_frames
 
 
-def make_particle_trace(particle_frame: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]) -> go.Scatter3d:
+def make_particle_trace(
+    particle_frame: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    name: str = "foam particles",
+    size_scale: float = 1.0,
+    opacity: float = 0.82,
+) -> go.Scatter3d:
     x, y, z, alpha = particle_frame
     return go.Scatter3d(
         x=x,
@@ -204,15 +209,42 @@ def make_particle_trace(particle_frame: tuple[np.ndarray, np.ndarray, np.ndarray
         z=z,
         mode="markers",
         marker={
-            "size": np.clip(2.5 + 4.5 * alpha, 1.5, 6.0),
+            "size": np.clip((2.5 + 4.5 * alpha) * size_scale, 1.0, 7.0),
             "color": alpha,
             "colorscale": [[0.0, "#dbeafe"], [0.35, "#eff6ff"], [1.0, "#ffffff"]],
-            "opacity": 0.82,
+            "opacity": opacity,
             "showscale": False,
         },
-        name="foam particles",
+        name=name,
         hovertemplate="foam age opacity=%{marker.color:.2f}<extra></extra>",
     )
+
+
+def make_trail_particle_frame(
+    particle_frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
+    frame_index: int,
+    trail_length: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    if trail_length <= 0:
+        empty = np.empty(0, dtype=np.float32)
+        return empty, empty, empty, empty
+
+    xs = []
+    ys = []
+    zs = []
+    alphas = []
+    start = max(0, frame_index - trail_length)
+    for offset, source_index in enumerate(range(start, frame_index)):
+        x, y, z, alpha = particle_frames[source_index]
+        fade = (offset + 1) / max(frame_index - start, 1)
+        xs.append(x)
+        ys.append(y)
+        zs.append(z - 0.006)
+        alphas.append(alpha * 0.35 * fade)
+    if not xs:
+        empty = np.empty(0, dtype=np.float32)
+        return empty, empty, empty, empty
+    return np.concatenate(xs), np.concatenate(ys), np.concatenate(zs), np.concatenate(alphas)
 
 
 def build_foam_particle_figure(
@@ -222,6 +254,8 @@ def build_foam_particle_figure(
     foam_threshold: float,
     foam_softness: float,
     foam_crest_bias: float,
+    trail_length: int,
+    frame_duration_ms: int,
 ) -> go.Figure:
     z_limit = max(float(np.max(np.abs(z))) for _, _, z in frames)
     z_limit = max(z_limit * 1.4, 0.08)
@@ -229,8 +263,10 @@ def build_foam_particle_figure(
 
     def traces_for(index: int, showscale: bool) -> list:
         x, y, z = frames[index]
+        trail_frame = make_trail_particle_frame(particle_frames, index, trail_length)
         return [
             make_surface_trace(x, y, z, showscale, "overlay", foam_threshold, foam_softness, foam_crest_bias),
+            make_particle_trace(trail_frame, name="foam trail", size_scale=0.8, opacity=0.35),
             make_particle_trace(particle_frames[index]),
         ]
 
@@ -271,7 +307,7 @@ def build_foam_particle_figure(
                         "args": [
                             None,
                             {
-                                "frame": {"duration": 90, "redraw": True},
+                                "frame": {"duration": frame_duration_ms, "redraw": True},
                                 "fromcurrent": True,
                                 "transition": {"duration": 0},
                             },
@@ -293,8 +329,8 @@ def build_foam_particle_figure(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Create an interactive choppy wave viewer with foam particles.")
     parser.add_argument("--size", type=int, default=384, help="Simulation grid size.")
-    parser.add_argument("--steps", type=int, default=600, help="Simulation steps.")
-    parser.add_argument("--frame-every", type=int, default=4, help="Save one frame every N simulation steps.")
+    parser.add_argument("--steps", type=int, default=2160, help="Simulation steps.")
+    parser.add_argument("--frame-every", type=int, default=2, help="Save one frame every N simulation steps.")
     parser.add_argument("--domain-size", type=float, default=8.0, help="Physical width of the periodic domain.")
     parser.add_argument("--gravity", type=float, default=9.81, help="Gravity coefficient.")
     parser.add_argument("--dt", type=float, default=0.025, help="Time step.")
@@ -309,11 +345,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--foam-threshold", type=float, default=0.035, help="Minimum downsampled eta steepness for foam.")
     parser.add_argument("--foam-softness", type=float, default=1.5, help="Soft transition width for foam source.")
     parser.add_argument("--foam-crest-bias", type=float, default=0.85, help="Lower values restrict foam more strongly to crests.")
-    parser.add_argument("--particle-life", type=float, default=1.3, help="Average foam particle lifetime in seconds.")
-    parser.add_argument("--particle-drift", type=float, default=0.55, help="Foam particle drift speed along wind direction.")
-    parser.add_argument("--particle-spread", type=float, default=0.10, help="Random drift spread per particle.")
-    parser.add_argument("--spawn-per-frame", type=int, default=70, help="Maximum new foam particles per rendered frame.")
-    parser.add_argument("--max-particles", type=int, default=1800, help="Maximum active foam particles.")
+    parser.add_argument("--particle-life", type=float, default=1.0, help="Average foam particle lifetime in seconds.")
+    parser.add_argument("--particle-drift", type=float, default=0.62, help="Foam particle drift speed along wind direction.")
+    parser.add_argument("--particle-spread", type=float, default=0.06, help="Random drift spread per particle.")
+    parser.add_argument("--spawn-per-frame", type=int, default=55, help="Maximum new foam particles per rendered frame.")
+    parser.add_argument("--max-particles", type=int, default=2400, help="Maximum active foam particles.")
+    parser.add_argument("--trail-length", type=int, default=5, help="Number of previous frames drawn as a soft foam trail.")
+    parser.add_argument("--frame-duration-ms", type=int, default=45, help="Animation frame duration in milliseconds.")
     parser.add_argument("--max-surface-points", type=int, default=160, help="Max rendered points per surface axis.")
     parser.add_argument("--output", type=Path, default=Path("outputs/spectral_foam_particle_viewer.html"), help="Output Plotly HTML path.")
     return parser.parse_args()
@@ -367,6 +405,8 @@ def main() -> None:
         foam_threshold=args.foam_threshold,
         foam_softness=args.foam_softness,
         foam_crest_bias=args.foam_crest_bias,
+        trail_length=args.trail_length,
+        frame_duration_ms=args.frame_duration_ms,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(args.output, include_plotlyjs=True, full_html=True)
