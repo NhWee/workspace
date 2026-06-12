@@ -7,8 +7,11 @@
 # size, steps, frame_every, dt, viscosity, pressure_iters, force_strength,
 # force_radius, wave_speed, surface_coupling, surface_damping, eta_scale,
 # foam_vorticity_threshold, foam_speed_threshold, foam_birth, foam_decay,
-# max_surface_points, fps, frame_duration_ms, output
+# surface_smoothing, max_eta_velocity, foam_particles, particle_life,
+# particle_spawn_per_frame, max_particles, quality, max_surface_points,
+# fps, frame_duration_ms, output
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 import sys
 
@@ -42,6 +45,31 @@ def normalize01(field: torch.Tensor) -> torch.Tensor:
     return (field - field_min) / torch.clamp(field_max - field_min, min=1.0e-6)
 
 
+@dataclass
+class FoamParticles:
+    x: torch.Tensor
+    y: torch.Tensor
+    age: torch.Tensor
+    life: torch.Tensor
+
+
+def empty_particles(device: torch.device) -> FoamParticles:
+    empty = torch.empty(0, device=device)
+    return FoamParticles(empty, empty, empty, empty)
+
+
+def smooth_field(field: torch.Tensor, amount: float) -> torch.Tensor:
+    if amount <= 0.0:
+        return field
+    neighbor_average = (
+        torch.roll(field, shifts=1, dims=0)
+        + torch.roll(field, shifts=-1, dims=0)
+        + torch.roll(field, shifts=1, dims=1)
+        + torch.roll(field, shifts=-1, dims=1)
+    ) * 0.25
+    return (1.0 - amount) * field + amount * neighbor_average
+
+
 def make_initial_eta(size: int, device: torch.device) -> torch.Tensor:
     xx, yy = make_grid(size, device)
     ring_a = torch.exp(-((xx - 0.35) ** 2 + (yy - 0.48) ** 2) / 0.018)
@@ -60,6 +88,8 @@ def update_surface(
     wave_speed: float,
     surface_coupling: float,
     surface_damping: float,
+    surface_smoothing: float,
+    max_eta_velocity: float,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     eta = advect(eta, u, v, dt)
     eta_velocity = advect(eta_velocity, u, v, dt)
@@ -73,9 +103,89 @@ def update_surface(
     acceleration = acceleration + surface_coupling * swirl_source
     acceleration = acceleration - surface_damping * eta_velocity
     eta_velocity = eta_velocity + acceleration * dt
+    if max_eta_velocity > 0.0:
+        eta_velocity = torch.clamp(eta_velocity, -max_eta_velocity, max_eta_velocity)
     eta = eta + eta_velocity * dt
+    eta = smooth_field(eta, surface_smoothing)
     eta = eta - torch.mean(eta)
     return eta, eta_velocity
+
+
+def sample_field(field: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    if len(x) == 0:
+        return torch.empty(0, device=field.device)
+    sample_grid = torch.stack((2.0 * torch.remainder(x, 1.0) - 1.0, 2.0 * torch.remainder(y, 1.0) - 1.0), dim=-1)
+    sampled = torch.nn.functional.grid_sample(
+        field.unsqueeze(0).unsqueeze(0),
+        sample_grid.view(1, -1, 1, 2),
+        mode="bilinear",
+        padding_mode="border",
+        align_corners=True,
+    )
+    return sampled[0, 0, :, 0]
+
+
+def step_foam_particles(
+    particles: FoamParticles,
+    foam: torch.Tensor,
+    eta: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    dt: float,
+    particle_life: float,
+    particle_spawn_per_frame: int,
+    max_particles: int,
+    frame_every: int,
+    step: int,
+) -> FoamParticles:
+    if len(particles.x) > 0:
+        vx = sample_field(u, particles.x, particles.y)
+        vy = sample_field(v, particles.x, particles.y)
+        age = particles.age + dt
+        x = torch.remainder(particles.x + vx * dt, 1.0)
+        y = torch.remainder(particles.y + vy * dt, 1.0)
+        alive = age < particles.life
+        particles = FoamParticles(x[alive], y[alive], age[alive], particles.life[alive])
+
+    spawn_count = max(0, int(np.ceil(particle_spawn_per_frame / max(frame_every, 1))))
+    if spawn_count > 0 and len(particles.x) < max_particles:
+        source = torch.flatten(foam)
+        source = torch.clamp(source - 0.18, min=0.0)
+        source_sum = torch.sum(source)
+        if float(source_sum.detach().cpu()) > 0.0:
+            spawn_count = min(spawn_count, max_particles - len(particles.x))
+            chosen = torch.multinomial(source / source_sum, spawn_count, replacement=True)
+            size = foam.shape[0]
+            new_y = (torch.div(chosen, size, rounding_mode="floor").float() + torch.rand(spawn_count, device=foam.device)) / size
+            new_x = ((chosen % size).float() + torch.rand(spawn_count, device=foam.device)) / size
+            new_life = torch.empty(spawn_count, device=foam.device).uniform_(0.65 * particle_life, 1.25 * particle_life)
+            particles = FoamParticles(
+                torch.cat([particles.x, new_x]),
+                torch.cat([particles.y, new_y]),
+                torch.cat([particles.age, torch.zeros(spawn_count, device=foam.device)]),
+                torch.cat([particles.life, new_life]),
+            )
+
+    return particles
+
+
+def particle_frame(
+    particles: FoamParticles,
+    eta: torch.Tensor,
+    eta_scale: float,
+    particle_height: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    if len(particles.x) == 0:
+        empty = np.empty(0, dtype=np.float32)
+        return empty, empty, empty, empty
+    z = sample_field(eta, particles.x, particles.y) * eta_scale + particle_height
+    alpha = torch.clamp(1.0 - particles.age / torch.clamp(particles.life, min=1.0e-6), 0.0, 1.0)
+    return (
+        (particles.x - 0.5).detach().cpu().numpy().astype(np.float32),
+        (particles.y - 0.5).detach().cpu().numpy().astype(np.float32),
+        z.detach().cpu().numpy().astype(np.float32),
+        alpha.detach().cpu().numpy().astype(np.float32),
+    )
 
 
 def simulate_free_surface(
@@ -90,20 +200,28 @@ def simulate_free_surface(
     wave_speed: float,
     surface_coupling: float,
     surface_damping: float,
+    surface_smoothing: float,
+    max_eta_velocity: float,
     eta_scale: float,
     foam_vorticity_threshold: float,
     foam_speed_threshold: float,
     foam_birth: float,
     foam_decay: float,
+    foam_particles: bool,
+    particle_life: float,
+    particle_spawn_per_frame: int,
+    max_particles: int,
+    particle_height: float,
     max_surface_points: int,
     device: torch.device,
-) -> list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
+) -> list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]]:
     dx = 1.0 / size
     xx, yy = make_grid(size, device)
     u, v = initial_velocity(size, device)
     eta = make_initial_eta(size, device)
     eta_velocity = torch.zeros_like(eta)
     foam = torch.zeros_like(eta)
+    particles = empty_particles(device)
     frames = []
 
     for step in range(steps):
@@ -126,6 +244,8 @@ def simulate_free_surface(
             wave_speed,
             surface_coupling,
             surface_damping,
+            surface_smoothing,
+            max_eta_velocity,
         )
         foam = update_foam(
             foam,
@@ -140,6 +260,20 @@ def simulate_free_surface(
         )
         crest = torch.relu((eta - torch.mean(eta)) / torch.clamp(torch.std(eta), min=1.0e-6))
         foam = torch.clamp(torch.maximum(foam, 0.12 * normalize01(crest)), 0.0, 1.0)
+        if foam_particles:
+            particles = step_foam_particles(
+                particles,
+                foam,
+                eta,
+                u,
+                v,
+                dt,
+                particle_life,
+                particle_spawn_per_frame,
+                max_particles,
+                frame_every,
+                step,
+            )
 
         if step % frame_every == 0:
             x = (xx - 0.5).detach().cpu().numpy().astype(np.float32)
@@ -151,6 +285,7 @@ def simulate_free_surface(
                 downsample(y, max_surface_points),
                 downsample(z, max_surface_points),
                 downsample(foam_np, max_surface_points),
+                particle_frame(particles, eta, eta_scale, particle_height) if foam_particles else particle_frame(empty_particles(device), eta, eta_scale, particle_height),
             ))
 
     return frames
@@ -188,17 +323,49 @@ def make_surface_trace(
     )
 
 
-def build_figure(frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]], frame_duration_ms: int) -> go.Figure:
-    z_limit = max(float(np.max(np.abs(z))) for _, _, z, _ in frames)
+def make_particle_trace(
+    particles: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray],
+    particle_size: float,
+) -> go.Scatter3d:
+    x, y, z, alpha = particles
+    return go.Scatter3d(
+        x=x,
+        y=y,
+        z=z,
+        mode="markers",
+        marker={
+            "size": np.clip((2.0 + 4.0 * alpha) * particle_size, 1.0, 7.0),
+            "color": alpha,
+            "colorscale": [[0.0, "#bfdbfe"], [0.45, "#e0f2fe"], [1.0, "#ffffff"]],
+            "opacity": 0.72,
+            "showscale": False,
+        },
+        name="foam particles",
+        hovertemplate="foam alpha=%{marker.color:.2f}<extra></extra>",
+    )
+
+
+def build_figure(
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]],
+    frame_duration_ms: int,
+    particle_size: float,
+) -> go.Figure:
+    z_limit = max(float(np.max(np.abs(z))) for _, _, z, _, _ in frames)
     z_limit = max(z_limit * 1.25, 0.02)
-    first_x, first_y, first_z, first_foam = frames[0]
-    fig = go.Figure(data=[make_surface_trace(first_x, first_y, first_z, first_foam, z_limit, True)])
+    first_x, first_y, first_z, first_foam, first_particles = frames[0]
+    fig = go.Figure(data=[
+        make_surface_trace(first_x, first_y, first_z, first_foam, z_limit, True),
+        make_particle_trace(first_particles, particle_size),
+    ])
     fig.frames = [
         go.Frame(
-            data=[make_surface_trace(x, y, z, foam, z_limit, False)],
+            data=[
+                make_surface_trace(x, y, z, foam, z_limit, False),
+                make_particle_trace(particles, particle_size),
+            ],
             name=str(index),
         )
-        for index, (x, y, z, foam) in enumerate(frames)
+        for index, (x, y, z, foam, particles) in enumerate(frames)
     ]
     frame_names = [frame.name for frame in fig.frames]
     animation_options = {
@@ -289,8 +456,9 @@ def build_figure(frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a Navier-Stokes driven 3D free-surface foam experiment.")
-    parser.add_argument("--size", type=int, default=144, help="Simulation grid size.")
-    parser.add_argument("--steps", type=int, default=720, help="Simulation steps.")
+    parser.add_argument("--quality", choices=("preview", "balanced", "final"), default="balanced", help="Output preset.")
+    parser.add_argument("--size", type=int, default=288, help="Simulation grid size.")
+    parser.add_argument("--steps", type=int, default=1080, help="Simulation steps.")
     parser.add_argument("--frame-every", type=int, default=3, help="Save one viewer frame every N simulation steps.")
     parser.add_argument("--dt", type=float, default=0.0045, help="Simulation time step.")
     parser.add_argument("--viscosity", type=float, default=0.00008, help="Kinematic viscosity.")
@@ -300,11 +468,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--wave-speed", type=float, default=0.18, help="Free-surface wave propagation speed.")
     parser.add_argument("--surface-coupling", type=float, default=0.55, help="How strongly vortices disturb the surface.")
     parser.add_argument("--surface-damping", type=float, default=0.85, help="Damping applied to vertical surface velocity.")
+    parser.add_argument("--surface-smoothing", type=float, default=0.08, help="Per-step surface smoothing amount.")
+    parser.add_argument("--max-eta-velocity", type=float, default=0.18, help="Clamp for vertical surface velocity. Use 0 to disable.")
     parser.add_argument("--eta-scale", type=float, default=1.0, help="Vertical display scale for eta.")
     parser.add_argument("--foam-vorticity-threshold", type=float, default=8.0, help="Curl magnitude needed to generate foam.")
     parser.add_argument("--foam-speed-threshold", type=float, default=0.18, help="Speed needed to generate foam.")
     parser.add_argument("--foam-birth", type=float, default=2.2, help="Foam generation rate.")
     parser.add_argument("--foam-decay", type=float, default=0.48, help="Foam fade-out rate.")
+    parser.add_argument("--foam-particles", action=argparse.BooleanOptionalAction, default=True, help="Render foam as particles above the surface.")
+    parser.add_argument("--particle-life", type=float, default=0.9, help="Average foam particle lifetime.")
+    parser.add_argument("--particle-spawn-per-frame", type=int, default=45, help="Approximate foam particles spawned per rendered frame.")
+    parser.add_argument("--max-particles", type=int, default=1600, help="Maximum active foam particles.")
+    parser.add_argument("--particle-height", type=float, default=0.006, help="Vertical offset above the surface for foam particles.")
+    parser.add_argument("--particle-size", type=float, default=0.85, help="Rendered foam particle size scale.")
     parser.add_argument("--max-surface-points", type=int, default=128, help="Max rendered points per surface axis.")
     parser.add_argument("--fps", type=float, default=None, help="Viewer playback FPS. Overrides --frame-duration-ms when set.")
     parser.add_argument("--frame-duration-ms", type=int, default=30, help="Animation frame duration in milliseconds.")
@@ -312,8 +488,24 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def apply_quality_preset(args: argparse.Namespace) -> None:
+    if args.quality == "preview":
+        args.size = min(args.size, 128)
+        args.steps = min(args.steps, 420)
+        args.frame_every = max(args.frame_every, 4)
+        args.pressure_iters = min(args.pressure_iters, 35)
+        args.max_surface_points = min(args.max_surface_points, 96)
+        args.max_particles = min(args.max_particles, 700)
+    elif args.quality == "final":
+        args.frame_every = min(args.frame_every, 2)
+        args.pressure_iters = max(args.pressure_iters, 80)
+        args.max_surface_points = max(args.max_surface_points, 160)
+        args.max_particles = max(args.max_particles, 2400)
+
+
 def main() -> None:
     args = parse_args()
+    apply_quality_preset(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     if device.type == "cuda":
@@ -331,11 +523,18 @@ def main() -> None:
         wave_speed=args.wave_speed,
         surface_coupling=args.surface_coupling,
         surface_damping=args.surface_damping,
+        surface_smoothing=args.surface_smoothing,
+        max_eta_velocity=args.max_eta_velocity,
         eta_scale=args.eta_scale,
         foam_vorticity_threshold=args.foam_vorticity_threshold,
         foam_speed_threshold=args.foam_speed_threshold,
         foam_birth=args.foam_birth,
         foam_decay=args.foam_decay,
+        foam_particles=args.foam_particles,
+        particle_life=args.particle_life,
+        particle_spawn_per_frame=args.particle_spawn_per_frame,
+        max_particles=args.max_particles,
+        particle_height=args.particle_height,
         max_surface_points=args.max_surface_points,
         device=device,
     )
@@ -343,7 +542,7 @@ def main() -> None:
     if args.fps is not None:
         frame_duration_ms = max(1, int(round(1000.0 / max(args.fps, 1.0e-6))))
 
-    fig = build_figure(frames, frame_duration_ms)
+    fig = build_figure(frames, frame_duration_ms, args.particle_size)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(args.output, include_plotlyjs=True, full_html=True)
     print(f"Saved Navier-Stokes free-surface viewer: {args.output}")

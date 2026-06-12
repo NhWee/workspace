@@ -81,6 +81,14 @@ How strongly vortices push/pull the surface.
 --surface-damping
 How quickly vertical surface motion settles down.
 
+--surface-smoothing
+Per-step smoothing applied to eta. Higher values reduce fast high-frequency
+fluctuation, but too much smoothing makes the surface look thick and slow.
+
+--max-eta-velocity
+Clamp for vertical surface velocity. This helps prevent sudden sharp flicker.
+Use 0 to disable the clamp.
+
 --eta-scale
 Visual vertical scale of the rendered surface.
 
@@ -95,6 +103,28 @@ How quickly foam is created.
 
 --foam-decay
 How quickly foam fades.
+
+--foam-particles / --no-foam-particles
+Turns the 3D foam particle layer on or off. The surface color still shows foam.
+
+--particle-life
+Average lifetime of foam particles.
+
+--particle-spawn-per-frame
+Approximate number of foam particles created per rendered frame.
+
+--max-particles
+Maximum active foam particles.
+
+--particle-height
+Small vertical offset that places foam particles above the water surface.
+
+--particle-size
+Rendered marker size scale for foam particles.
+
+--quality
+Output preset. preview is faster and lighter, balanced is the default, and
+final keeps more frames/detail.
 
 --fps
 Viewer playback FPS. If this is provided, it overrides --frame-duration-ms.
@@ -132,6 +162,10 @@ Play or Replay.
 More energetic surface:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --force-strength 5.2 --surface-coupling 0.75 --wave-speed 0.22
+
+Calmer surface with clearer foam particles:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --wave-speed 0.10 --surface-coupling 0.35 --surface-damping 1.2 --surface-smoothing 0.12 --particle-spawn-per-frame 65
 
 How this connects to the final goal
 -----------------------------------
