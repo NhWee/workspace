@@ -117,6 +117,18 @@ Slower playback for checking fast fluctuation:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24
 
+HTML controls
+-------------
+Replay starts again from the first frame. Use this after the animation has
+already reached the end.
+
+Play continues from the current slider position.
+
+Pause stops the animation.
+
+The frame slider can be dragged to inspect a specific moment before pressing
+Play or Replay.
+
 More energetic surface:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --force-strength 5.2 --surface-coupling 0.75 --wave-speed 0.22

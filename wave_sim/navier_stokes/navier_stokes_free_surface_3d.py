@@ -200,6 +200,12 @@ def build_figure(frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
         )
         for index, (x, y, z, foam) in enumerate(frames)
     ]
+    frame_names = [frame.name for frame in fig.frames]
+    animation_options = {
+        "frame": {"duration": frame_duration_ms, "redraw": True},
+        "transition": {"duration": 0},
+        "mode": "immediate",
+    }
     fig.update_layout(
         title="Navier-Stokes driven 3D free-surface foam experiment",
         width=980,
@@ -224,14 +230,24 @@ def build_figure(frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
                 "direction": "left",
                 "buttons": [
                     {
+                        "label": "Replay",
+                        "method": "animate",
+                        "args": [
+                            frame_names,
+                            {
+                                **animation_options,
+                                "fromcurrent": False,
+                            },
+                        ],
+                    },
+                    {
                         "label": "Play",
                         "method": "animate",
                         "args": [
                             None,
                             {
-                                "frame": {"duration": frame_duration_ms, "redraw": True},
+                                **animation_options,
                                 "fromcurrent": True,
-                                "transition": {"duration": 0},
                             },
                         ],
                     },
@@ -240,6 +256,30 @@ def build_figure(frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarr
                         "method": "animate",
                         "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"}],
                     },
+                ],
+            }
+        ],
+        sliders=[
+            {
+                "active": 0,
+                "x": 0.12,
+                "y": 0.0,
+                "len": 0.76,
+                "currentvalue": {"prefix": "frame ", "font": {"size": 12}},
+                "steps": [
+                    {
+                        "label": str(index),
+                        "method": "animate",
+                        "args": [
+                            [name],
+                            {
+                                "frame": {"duration": 0, "redraw": True},
+                                "transition": {"duration": 0},
+                                "mode": "immediate",
+                            },
+                        ],
+                    }
+                    for index, name in enumerate(frame_names)
                 ],
             }
         ],
