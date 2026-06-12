@@ -1,0 +1,123 @@
+Navier-Stokes driven 3D free-surface guide
+==========================================
+
+File
+----
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\wave_sim\navier_stokes\navier_stokes_free_surface_3d.py
+
+What this makes
+---------------
+This is the first step from the 2D Navier-Stokes foam experiment toward a 3D
+water surface.
+
+It still solves the fluid motion on a 2D horizontal grid, but it adds a height
+field:
+
+eta(x, y, t)
+
+The result is rendered as a 3D surface. Foam is drawn into the surface color, so
+bright regions indicate energetic white-water-like areas.
+
+Equations
+---------
+The horizontal velocity field uses the 2D incompressible Navier-Stokes form:
+
+du/dt + (u dot grad)u = -grad(p) + viscosity * laplacian(u) + force
+div(u) = 0
+
+The free surface is a height field coupled to the flow:
+
+d2 eta/dt2 =
+    wave_speed^2 * laplacian(eta)
+    + surface_coupling * vortex_source
+    - surface_damping * d eta/dt
+
+eta is also advected by the horizontal velocity field, so the surface pattern is
+carried around by the flow.
+
+Foam model
+----------
+Foam is generated from:
+
+1. high vorticity
+2. high speed
+3. elevated crests
+
+This is not yet a full bubble/air-water simulation. It is a useful visual and
+algorithmic step toward white water driven by the fluid state.
+
+Important parameters
+--------------------
+--size
+Simulation resolution.
+
+--steps
+Total simulation length.
+
+--frame-every
+Lower values save more animation frames and look smoother.
+
+--dt
+Simulation time step.
+
+--viscosity
+Higher values smooth the flow. Lower values keep sharper vortices.
+
+--pressure-iters
+Higher values make the velocity field more incompressible, but cost more time.
+
+--force-strength
+Strength of the rotating flow sources.
+
+--force-radius
+Radius of the rotating flow sources.
+
+--wave-speed
+How quickly surface height ripples propagate.
+
+--surface-coupling
+How strongly vortices push/pull the surface.
+
+--surface-damping
+How quickly vertical surface motion settles down.
+
+--eta-scale
+Visual vertical scale of the rendered surface.
+
+--foam-vorticity-threshold
+How much swirl is needed before foam appears.
+
+--foam-speed-threshold
+How much speed is needed before foam appears.
+
+--foam-birth
+How quickly foam is created.
+
+--foam-decay
+How quickly foam fades.
+
+Example
+-------
+From the project root:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d
+
+Smoother output:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --frame-every 2 --frame-duration-ms 25
+
+More energetic surface:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --force-strength 5.2 --surface-coupling 0.75 --wave-speed 0.22
+
+How this connects to the final goal
+-----------------------------------
+This is not yet a full 3D Navier-Stokes free-surface solver like VOF, FLIP, or
+SPH. It is a practical intermediate stage:
+
+1. keep a fast 2D Navier-Stokes velocity field
+2. add a 3D height-field free surface
+3. drive foam from vorticity, speed, and crests
+
+The next step would be adding obstacles, shoreline/bathymetry, or particle foam
+on top of this 3D surface.
