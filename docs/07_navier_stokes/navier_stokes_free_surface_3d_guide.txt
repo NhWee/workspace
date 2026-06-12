@@ -122,6 +122,37 @@ Small vertical offset that places foam particles above the water surface.
 --particle-size
 Rendered marker size scale for foam particles.
 
+--splash-particles / --no-splash-particles
+Turns upward splash particles on or off. Splash particles are emitted from
+energetic foam/vorticity regions and then fall under gravity.
+
+--splash-spawn-per-frame
+Approximate number of splash particles created per rendered frame.
+
+--max-splash-particles
+Maximum active splash particles.
+
+--splash-life
+Average splash particle lifetime.
+
+--splash-gravity
+Downward acceleration applied to splash particles.
+
+--splash-threshold
+Minimum energetic source value before splash appears.
+
+--splash-size
+Rendered splash particle size scale.
+
+--vortex-markers / --no-vortex-markers
+Turns high-vorticity marker points on or off.
+
+--max-vortex-markers
+Maximum vortex markers per frame.
+
+--vortex-size
+Rendered vortex marker size scale.
+
 --quality
 Output preset. preview is faster and lighter, balanced is the default, and
 final keeps more frames/detail.
@@ -166,6 +197,10 @@ python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --force-strength 
 Calmer surface with clearer foam particles:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --wave-speed 0.10 --surface-coupling 0.35 --surface-damping 1.2 --surface-smoothing 0.12 --particle-spawn-per-frame 65
+
+More splash and visible vortex markers:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --size 64 --steps 720 --frame-every 2 --max-surface-points 64 --particle-spawn-per-frame 25 --splash-spawn-per-frame 18 --max-splash-particles 500 --max-vortex-markers 80
 
 How this connects to the final goal
 -----------------------------------
