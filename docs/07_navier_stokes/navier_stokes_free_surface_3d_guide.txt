@@ -58,8 +58,8 @@ smooth_long
 Lightweight, longer, smoother playback.
 
 dynamic_splash
-More energetic initial flow, stronger splash particles, and visible vortex
-spirals.
+More energetic initial flow and stronger splash particles. Analysis overlays
+are off by default for a more realistic view.
 
 vortex_focus
 Emphasizes visible vortex spirals and high-vorticity regions.
@@ -196,7 +196,8 @@ Horizontal random spread for splash particles.
 Rendered splash particle size scale.
 
 --vortex-markers / --no-vortex-markers
-Turns high-vorticity marker points on or off.
+Turns high-vorticity analysis marker points on or off. Keep this off for
+realistic output.
 
 --max-vortex-markers
 Maximum vortex markers per frame.
@@ -205,8 +206,9 @@ Maximum vortex markers per frame.
 Rendered vortex marker size scale.
 
 --vortex-spirals / --no-vortex-spirals
-Turns visible spiral line overlays on or off. Spiral lines make the main
-vortices easier to see than marker points alone.
+Turns visible analysis spiral line overlays on or off. Spiral lines make the
+main vortices easier to inspect, but they are not part of the physical water
+surface. Keep this off for realistic output.
 
 --vortex-spiral-count
 Number of visible vortex spirals.
@@ -272,6 +274,10 @@ python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --wave-s
 More splash and visible vortex markers:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --size 64 --steps 720 --frame-every 2 --max-surface-points 64 --particle-spawn-per-frame 25 --splash-spawn-per-frame 18 --max-splash-particles 500 --max-vortex-markers 80
+
+Use this only as an analysis view:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --scene dynamic_splash --vortex-markers --vortex-spirals
 
 More dynamic initial flow, stronger splash, and visible vortex spirals:
 

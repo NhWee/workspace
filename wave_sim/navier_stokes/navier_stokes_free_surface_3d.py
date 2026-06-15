@@ -49,9 +49,8 @@ SCENE_PRESETS = {
         "max_particles": 600,
         "splash_spawn_per_frame": 10,
         "max_splash_particles": 260,
-        "max_vortex_markers": 45,
-        "vortex_spiral_count": 3,
-        "vortex_spiral_radius": 0.10,
+        "vortex_markers": False,
+        "vortex_spirals": False,
         "force_strength": 4.8,
         "force_radius": 0.13,
         "wave_speed": 0.10,
@@ -91,10 +90,8 @@ SCENE_PRESETS = {
         "splash_gravity": 2.40,
         "splash_burst_max": 1.80,
         "splash_spread": 0.085,
-        "vortex_spiral_count": 5,
-        "vortex_spiral_radius": 0.13,
-        "vortex_line_width": 7.0,
-        "max_vortex_markers": 90,
+        "vortex_markers": False,
+        "vortex_spirals": False,
         "output": Path("outputs/navier_stokes_free_surface_3d_dynamic_splash_scene.html"),
     },
     "vortex_focus": {
@@ -1023,10 +1020,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--splash-burst-max", type=float, default=1.45, help="Maximum upward splash velocity.")
     parser.add_argument("--splash-spread", type=float, default=0.065, help="Horizontal random spread for splash particles.")
     parser.add_argument("--splash-size", type=float, default=0.8, help="Rendered splash particle size scale.")
-    parser.add_argument("--vortex-markers", action=argparse.BooleanOptionalAction, default=True, help="Render markers on high-vorticity regions.")
+    parser.add_argument("--vortex-markers", action=argparse.BooleanOptionalAction, default=False, help="Render analysis markers on high-vorticity regions.")
     parser.add_argument("--max-vortex-markers", type=int, default=90, help="Maximum vortex markers per frame.")
     parser.add_argument("--vortex-size", type=float, default=0.75, help="Rendered vortex marker size scale.")
-    parser.add_argument("--vortex-spirals", action=argparse.BooleanOptionalAction, default=True, help="Render spiral lines over high-vorticity regions.")
+    parser.add_argument("--vortex-spirals", action=argparse.BooleanOptionalAction, default=False, help="Render analysis spiral lines over high-vorticity regions.")
     parser.add_argument("--vortex-spiral-count", type=int, default=4, help="Number of visible vortex spirals.")
     parser.add_argument("--vortex-spiral-points", type=int, default=48, help="Points per vortex spiral.")
     parser.add_argument("--vortex-spiral-radius", type=float, default=0.105, help="Radius of each rendered vortex spiral.")
