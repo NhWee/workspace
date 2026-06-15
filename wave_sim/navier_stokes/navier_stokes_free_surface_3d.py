@@ -741,6 +741,7 @@ def make_surface_trace(
         colorbar={"title": "eta + foam"} if showscale else None,
         opacity=0.92,
         contours_z={"show": False},
+        uid="free_surface",
         hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>eta=%{z:.4f}<extra>free surface</extra>",
     )
 
@@ -763,6 +764,7 @@ def make_particle_trace(
             "showscale": False,
         },
         name="foam particles",
+        uid="foam_particles",
         hovertemplate="foam alpha=%{marker.color:.2f}<extra></extra>",
     )
 
@@ -785,6 +787,7 @@ def make_splash_trace(
             "showscale": False,
         },
         name="splash",
+        uid="splash_particles",
         hovertemplate="splash alpha=%{marker.color:.2f}<extra></extra>",
     )
 
@@ -807,6 +810,7 @@ def make_vortex_trace(
             "showscale": False,
         },
         name="vortex markers",
+        uid="vortex_markers",
         hovertemplate="vortex=%{marker.color:.2f}<extra></extra>",
     )
 
@@ -828,8 +832,24 @@ def make_vortex_spiral_trace(
         },
         opacity=0.82,
         name="vortex spirals",
+        uid="vortex_spirals",
         hoverinfo="skip",
     )
+
+
+def frame_z_limit(
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]],
+) -> float:
+    z_values = []
+    for _x, _y, z, _foam, particles, splash, vortex, spiral in frames:
+        z_values.append(np.abs(z).ravel())
+        for layer in (particles, splash, vortex, spiral):
+            if len(layer[2]) > 0:
+                z_values.append(np.abs(layer[2][np.isfinite(layer[2])]).ravel())
+    finite = np.concatenate([values for values in z_values if len(values) > 0])
+    if len(finite) == 0:
+        return 0.02
+    return max(float(np.max(finite)) * 1.20, 0.02)
 
 
 def build_figure(
@@ -840,8 +860,7 @@ def build_figure(
     vortex_size: float,
     vortex_line_width: float,
 ) -> go.Figure:
-    z_limit = max(float(np.max(np.abs(z))) for _, _, z, _, _, _, _, _ in frames)
-    z_limit = max(z_limit * 1.25, 0.02)
+    z_limit = frame_z_limit(frames)
     first_x, first_y, first_z, first_foam, first_particles, first_splash, first_vortex, first_spiral = frames[0]
     fig = go.Figure(data=[
         make_surface_trace(first_x, first_y, first_z, first_foam, z_limit, True),
@@ -865,7 +884,7 @@ def build_figure(
     ]
     frame_names = [frame.name for frame in fig.frames]
     animation_options = {
-        "frame": {"duration": frame_duration_ms, "redraw": True},
+        "frame": {"duration": frame_duration_ms, "redraw": False},
         "transition": {"duration": 0},
         "mode": "immediate",
     }
@@ -876,13 +895,16 @@ def build_figure(
         paper_bgcolor="#06101d",
         plot_bgcolor="#06101d",
         font={"color": "#e5edf7"},
+        uirevision="fixed_camera",
         margin={"l": 0, "r": 0, "t": 56, "b": 0},
         scene={
-            "xaxis": {"title": "x", "range": [-0.55, 0.55], "backgroundcolor": "#06101d", "gridcolor": "#17324a"},
-            "yaxis": {"title": "y", "range": [-0.55, 0.55], "backgroundcolor": "#06101d", "gridcolor": "#17324a"},
-            "zaxis": {"title": "eta", "range": [-z_limit, z_limit], "backgroundcolor": "#06101d", "gridcolor": "#17324a"},
+            "xaxis": {"title": "x", "range": [-0.55, 0.55], "autorange": False, "backgroundcolor": "#06101d", "gridcolor": "#17324a"},
+            "yaxis": {"title": "y", "range": [-0.55, 0.55], "autorange": False, "backgroundcolor": "#06101d", "gridcolor": "#17324a"},
+            "zaxis": {"title": "eta", "range": [-z_limit, z_limit], "autorange": False, "backgroundcolor": "#06101d", "gridcolor": "#17324a"},
+            "aspectmode": "manual",
             "aspectratio": {"x": 1.0, "y": 1.0, "z": 0.26},
             "camera": {"eye": {"x": 1.35, "y": 1.25, "z": 0.78}},
+            "uirevision": "fixed_camera",
         },
         updatemenus=[
             {
@@ -936,7 +958,7 @@ def build_figure(
                         "args": [
                             [name],
                             {
-                                "frame": {"duration": 0, "redraw": True},
+                                "frame": {"duration": 0, "redraw": False},
                                 "transition": {"duration": 0},
                                 "mode": "immediate",
                             },
