@@ -884,7 +884,7 @@ def build_figure(
     ]
     frame_names = [frame.name for frame in fig.frames]
     animation_options = {
-        "frame": {"duration": frame_duration_ms, "redraw": False},
+        "frame": {"duration": frame_duration_ms, "redraw": True},
         "transition": {"duration": 0},
         "mode": "immediate",
     }
@@ -939,7 +939,7 @@ def build_figure(
                     {
                         "label": "Pause",
                         "method": "animate",
-                        "args": [[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate"}],
+                        "args": [[None], {"frame": {"duration": 0, "redraw": True}, "mode": "immediate"}],
                     },
                 ],
             }
@@ -958,7 +958,7 @@ def build_figure(
                         "args": [
                             [name],
                             {
-                                "frame": {"duration": 0, "redraw": False},
+                                "frame": {"duration": 0, "redraw": True},
                                 "transition": {"duration": 0},
                                 "mode": "immediate",
                             },
