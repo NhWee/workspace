@@ -64,6 +64,10 @@ are off by default for a more realistic view.
 vortex_focus
 Emphasizes visible vortex spirals and high-vorticity regions.
 
+rock_wake
+Incoming waves hit a circular rock obstacle and create wake, streaks, foam, and
+splash. This is the recommended scene for a more turbulent realistic view.
+
 Scene presets can still be overridden. For example, --scene dynamic_splash
 --fps 30 keeps the dynamic_splash setup but changes playback FPS.
 
@@ -116,6 +120,26 @@ Direction of the incoming wave forcing.
 
 --periodic-inlet-width
 Width of the side region where the periodic wave enters the domain.
+
+--obstacle / --no-obstacle
+Adds a circular rock obstacle. The flow is damped inside the obstacle, and the
+wake region drives stronger foam and surface streaks.
+
+--obstacle-x / --obstacle-y / --obstacle-radius
+Position and size of the circular obstacle.
+
+--obstacle-wake-strength
+How strongly the obstacle wake contributes to foam and streaks.
+
+--vorticity-confinement
+Adds energy back into vortices so turbulent structures remain visible longer.
+
+--streak-strength
+Strength of the advected surface streak texture. This makes the flow direction
+more visible without adding analysis marker lines.
+
+--streak-decay
+How quickly the advected streak texture fades.
 
 --wave-speed
 How quickly surface height ripples propagate.
@@ -242,6 +266,10 @@ python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d
 Use a reusable scene preset:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --scene dynamic_splash
+
+Turbulent incoming waves around a rock obstacle:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --scene rock_wake
 
 Smoother output:
 

@@ -94,6 +94,43 @@ SCENE_PRESETS = {
         "vortex_spirals": False,
         "output": Path("outputs/navier_stokes_free_surface_3d_dynamic_splash_scene.html"),
     },
+    "rock_wake": {
+        "size": 72,
+        "steps": 900,
+        "frame_every": 2,
+        "pressure_iters": 24,
+        "fps": 24.0,
+        "max_surface_points": 72,
+        "force_strength": 5.6,
+        "force_radius": 0.15,
+        "wave_speed": 0.13,
+        "surface_coupling": 0.50,
+        "surface_damping": 1.10,
+        "surface_smoothing": 0.10,
+        "periodic_force": True,
+        "periodic_force_strength": 0.28,
+        "periodic_surface_strength": 0.050,
+        "periodic_wavelength": 0.54,
+        "periodic_period": 1.35,
+        "obstacle": True,
+        "obstacle_x": 0.52,
+        "obstacle_y": 0.50,
+        "obstacle_radius": 0.115,
+        "obstacle_wake_strength": 1.60,
+        "vorticity_confinement": 0.18,
+        "streak_strength": 0.38,
+        "particle_spawn_per_frame": 34,
+        "max_particles": 900,
+        "splash_spawn_per_frame": 38,
+        "max_splash_particles": 820,
+        "splash_life": 0.52,
+        "splash_gravity": 2.35,
+        "splash_burst_max": 1.95,
+        "splash_spread": 0.095,
+        "vortex_markers": False,
+        "vortex_spirals": False,
+        "output": Path("outputs/navier_stokes_free_surface_3d_rock_wake_scene.html"),
+    },
     "vortex_focus": {
         "size": 72,
         "steps": 720,
@@ -176,6 +213,71 @@ def smooth_field(field: torch.Tensor, amount: float) -> torch.Tensor:
         + torch.roll(field, shifts=-1, dims=1)
     ) * 0.25
     return (1.0 - amount) * field + amount * neighbor_average
+
+
+def obstacle_fields(
+    xx: torch.Tensor,
+    yy: torch.Tensor,
+    enabled: bool,
+    center_x: float,
+    center_y: float,
+    radius: float,
+    edge_width: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if not enabled:
+        zeros = torch.zeros_like(xx)
+        ones = torch.ones_like(xx)
+        return zeros, ones
+    distance = torch.sqrt((xx - center_x) ** 2 + (yy - center_y) ** 2)
+    solid = torch.clamp((radius + edge_width - distance) / max(edge_width, 1.0e-6), 0.0, 1.0)
+    fluid = 1.0 - solid
+    return solid, fluid
+
+
+def apply_obstacle_velocity(u: torch.Tensor, v: torch.Tensor, solid: torch.Tensor, fluid: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    if float(torch.max(solid).detach().cpu()) <= 0.0:
+        return u, v
+    return u * fluid, v * fluid
+
+
+def obstacle_wake_source(
+    xx: torch.Tensor,
+    yy: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    solid: torch.Tensor,
+    center_x: float,
+    center_y: float,
+    radius: float,
+) -> torch.Tensor:
+    if float(torch.max(solid).detach().cpu()) <= 0.0:
+        return torch.zeros_like(xx)
+    distance = torch.sqrt((xx - center_x) ** 2 + (yy - center_y) ** 2)
+    ring = torch.exp(-((distance - radius) ** 2) / max((0.45 * radius) ** 2, 1.0e-6))
+    downstream = torch.sigmoid((xx - center_x) / max(radius * 0.55, 1.0e-6))
+    speed = torch.sqrt(u * u + v * v)
+    return ring * (0.35 + 0.65 * downstream) * normalize01(speed)
+
+
+def apply_vorticity_confinement(u: torch.Tensor, v: torch.Tensor, dx: float, strength: float, dt: float) -> tuple[torch.Tensor, torch.Tensor]:
+    if strength <= 0.0:
+        return u, v
+    omega = curl_z(u, v, dx)
+    omega_abs = torch.abs(omega)
+    grad_x = (torch.roll(omega_abs, shifts=-1, dims=1) - torch.roll(omega_abs, shifts=1, dims=1)) / (2.0 * dx)
+    grad_y = (torch.roll(omega_abs, shifts=-1, dims=0) - torch.roll(omega_abs, shifts=1, dims=0)) / (2.0 * dx)
+    norm = torch.sqrt(grad_x * grad_x + grad_y * grad_y + 1.0e-6)
+    normal_x = grad_x / norm
+    normal_y = grad_y / norm
+    force_x = normal_y * omega
+    force_y = -normal_x * omega
+    return u + strength * force_x * dt, v + strength * force_y * dt
+
+
+def update_streak(streak: torch.Tensor, u: torch.Tensor, v: torch.Tensor, source: torch.Tensor, dt: float, decay: float, birth: float) -> torch.Tensor:
+    streak = advect(streak, u, v, dt)
+    streak = streak * np.exp(-decay * dt) + source * birth * dt
+    return torch.clamp(streak, 0.0, 1.0)
 
 
 def make_initial_eta(size: int, device: torch.device) -> torch.Tensor:
@@ -552,6 +654,15 @@ def simulate_free_surface(
     periodic_period: float,
     periodic_direction_degrees: float,
     periodic_inlet_width: float,
+    obstacle: bool,
+    obstacle_x: float,
+    obstacle_y: float,
+    obstacle_radius: float,
+    obstacle_edge_width: float,
+    obstacle_wake_strength: float,
+    vorticity_confinement: float,
+    streak_strength: float,
+    streak_decay: float,
     wave_speed: float,
     surface_coupling: float,
     surface_damping: float,
@@ -587,10 +698,13 @@ def simulate_free_surface(
 ) -> list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]]:
     dx = 1.0 / size
     xx, yy = make_grid(size, device)
+    solid, fluid = obstacle_fields(xx, yy, obstacle, obstacle_x, obstacle_y, obstacle_radius, obstacle_edge_width)
     u, v = make_initial_velocity(size, device, force_strength, force_radius * 1.35)
+    u, v = apply_obstacle_velocity(u, v, solid, fluid)
     eta = make_initial_eta(size, device)
     eta_velocity = torch.zeros_like(eta)
     foam = torch.zeros_like(eta)
+    streak = torch.zeros_like(eta)
     particles = empty_particles(device)
     splash = empty_splash_particles(device)
     frames = []
@@ -626,7 +740,10 @@ def simulate_free_surface(
             u = u + viscosity * laplacian(u, dx) * dt
             v = v + viscosity * laplacian(v, dx) * dt
 
+        u, v = apply_vorticity_confinement(u, v, dx, vorticity_confinement, dt)
+        u, v = apply_obstacle_velocity(u, v, solid, fluid)
         u, v = project_velocity(u, v, dx, pressure_iters)
+        u, v = apply_obstacle_velocity(u, v, solid, fluid)
         eta, eta_velocity = update_surface(
             eta,
             eta_velocity,
@@ -653,9 +770,13 @@ def simulate_free_surface(
             foam_decay,
         )
         crest = torch.relu((eta - torch.mean(eta)) / torch.clamp(torch.std(eta), min=1.0e-6))
-        foam = torch.clamp(torch.maximum(foam, 0.12 * normalize01(crest)), 0.0, 1.0)
         vorticity = curl_z(u, v, dx)
         speed = torch.sqrt(u * u + v * v)
+        wake = obstacle_wake_source(xx, yy, u, v, solid, obstacle_x, obstacle_y, obstacle_radius)
+        streak_source = normalize01(torch.abs(vorticity)) * normalize01(speed) + obstacle_wake_strength * wake
+        streak = update_streak(streak, u, v, torch.clamp(streak_source, 0.0, 1.0), dt, streak_decay, streak_strength)
+        foam = torch.clamp(torch.maximum(foam, 0.12 * normalize01(crest)), 0.0, 1.0)
+        foam = torch.clamp(torch.maximum(foam, 0.35 * wake), 0.0, 1.0)
         if foam_particles:
             particles = step_foam_particles(
                 particles,
@@ -696,11 +817,12 @@ def simulate_free_surface(
             y = (yy - 0.5).detach().cpu().numpy().astype(np.float32)
             z = (eta * eta_scale).detach().cpu().numpy().astype(np.float32)
             foam_np = foam.detach().cpu().numpy().astype(np.float32)
+            streak_np = streak.detach().cpu().numpy().astype(np.float32)
             frames.append((
                 downsample(x, max_surface_points),
                 downsample(y, max_surface_points),
                 downsample(z, max_surface_points),
-                downsample(foam_np, max_surface_points),
+                downsample(np.clip(foam_np + 0.45 * streak_np, 0.0, 1.0), max_surface_points),
                 particle_frame(particles, eta, eta_scale, particle_height) if foam_particles else particle_frame(empty_particles(device), eta, eta_scale, particle_height),
                 splash_frame(splash, eta_scale) if splash_particles else splash_frame(empty_splash_particles(device), eta_scale),
                 vortex_marker_frame(xx, yy, eta, vorticity, speed, eta_scale, max_vortex_markers) if vortex_markers else vortex_marker_frame(xx, yy, eta, vorticity, speed, eta_scale, 0),
@@ -994,6 +1116,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--periodic-period", type=float, default=1.60, help="Temporal period of the external forcing pattern.")
     parser.add_argument("--periodic-direction-degrees", type=float, default=0.0, help="Direction of periodic forcing in degrees.")
     parser.add_argument("--periodic-inlet-width", type=float, default=0.20, help="Width of the side inlet region for periodic forcing.")
+    parser.add_argument("--obstacle", action=argparse.BooleanOptionalAction, default=False, help="Add a circular rock obstacle that creates wake and foam.")
+    parser.add_argument("--obstacle-x", type=float, default=0.52, help="Obstacle center x in normalized domain coordinates.")
+    parser.add_argument("--obstacle-y", type=float, default=0.50, help="Obstacle center y in normalized domain coordinates.")
+    parser.add_argument("--obstacle-radius", type=float, default=0.11, help="Obstacle radius in normalized domain coordinates.")
+    parser.add_argument("--obstacle-edge-width", type=float, default=0.025, help="Soft edge width for obstacle-fluid transition.")
+    parser.add_argument("--obstacle-wake-strength", type=float, default=1.2, help="Wake foam/streak strength around the obstacle.")
+    parser.add_argument("--vorticity-confinement", type=float, default=0.0, help="Strength of vorticity confinement turbulence boost.")
+    parser.add_argument("--streak-strength", type=float, default=0.0, help="Strength of advected surface streak texture.")
+    parser.add_argument("--streak-decay", type=float, default=0.45, help="Decay rate for advected surface streak texture.")
     parser.add_argument("--wave-speed", type=float, default=0.18, help="Free-surface wave propagation speed.")
     parser.add_argument("--surface-coupling", type=float, default=0.55, help="How strongly vortices disturb the surface.")
     parser.add_argument("--surface-damping", type=float, default=0.85, help="Damping applied to vertical surface velocity.")
@@ -1093,6 +1224,15 @@ def main() -> None:
         periodic_period=args.periodic_period,
         periodic_direction_degrees=args.periodic_direction_degrees,
         periodic_inlet_width=args.periodic_inlet_width,
+        obstacle=args.obstacle,
+        obstacle_x=args.obstacle_x,
+        obstacle_y=args.obstacle_y,
+        obstacle_radius=args.obstacle_radius,
+        obstacle_edge_width=args.obstacle_edge_width,
+        obstacle_wake_strength=args.obstacle_wake_strength,
+        vorticity_confinement=args.vorticity_confinement,
+        streak_strength=args.streak_strength,
+        streak_decay=args.streak_decay,
         wave_speed=args.wave_speed,
         surface_coupling=args.surface_coupling,
         surface_damping=args.surface_damping,
