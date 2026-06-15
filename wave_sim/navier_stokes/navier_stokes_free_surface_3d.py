@@ -741,6 +741,7 @@ def make_surface_trace(
         colorbar={"title": "eta + foam"} if showscale else None,
         opacity=0.92,
         contours_z={"show": False},
+        showlegend=False,
         uid="free_surface",
         hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>eta=%{z:.4f}<extra>free surface</extra>",
     )
@@ -764,6 +765,7 @@ def make_particle_trace(
             "showscale": False,
         },
         name="foam particles",
+        showlegend=False,
         uid="foam_particles",
         hovertemplate="foam alpha=%{marker.color:.2f}<extra></extra>",
     )
@@ -787,6 +789,7 @@ def make_splash_trace(
             "showscale": False,
         },
         name="splash",
+        showlegend=False,
         uid="splash_particles",
         hovertemplate="splash alpha=%{marker.color:.2f}<extra></extra>",
     )
@@ -810,6 +813,7 @@ def make_vortex_trace(
             "showscale": False,
         },
         name="vortex markers",
+        showlegend=False,
         uid="vortex_markers",
         hovertemplate="vortex=%{marker.color:.2f}<extra></extra>",
     )
@@ -832,6 +836,7 @@ def make_vortex_spiral_trace(
         },
         opacity=0.82,
         name="vortex spirals",
+        showlegend=False,
         uid="vortex_spirals",
         hoverinfo="skip",
     )
@@ -895,6 +900,7 @@ def build_figure(
         paper_bgcolor="#06101d",
         plot_bgcolor="#06101d",
         font={"color": "#e5edf7"},
+        showlegend=False,
         uirevision="fixed_camera",
         margin={"l": 0, "r": 0, "t": 56, "b": 0},
         scene={
