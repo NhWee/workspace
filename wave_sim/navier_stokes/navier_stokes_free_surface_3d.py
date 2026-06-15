@@ -10,7 +10,7 @@
 # surface_smoothing, max_eta_velocity, foam_particles, particle_life,
 # particle_spawn_per_frame, max_particles, splash_particles,
 # splash_spawn_per_frame, splash_life, vortex_markers, quality,
-# max_surface_points, fps, frame_duration_ms, output
+# scene, max_surface_points, fps, frame_duration_ms, output
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,6 +32,83 @@ from wave_sim.navier_stokes.navier_stokes_foam_2d import (
     project_velocity,
     update_foam,
 )
+
+
+SCENE_PRESETS = {
+    "none": {},
+    "smooth_long": {
+        "size": 64,
+        "steps": 720,
+        "frame_every": 2,
+        "pressure_iters": 15,
+        "fps": 24.0,
+        "max_surface_points": 64,
+        "particle_spawn_per_frame": 20,
+        "max_particles": 600,
+        "splash_spawn_per_frame": 10,
+        "max_splash_particles": 260,
+        "max_vortex_markers": 45,
+        "vortex_spiral_count": 3,
+        "vortex_spiral_radius": 0.10,
+        "force_strength": 4.8,
+        "force_radius": 0.13,
+        "wave_speed": 0.10,
+        "surface_coupling": 0.35,
+        "surface_damping": 1.20,
+        "surface_smoothing": 0.12,
+        "output": Path("outputs/navier_stokes_free_surface_3d_smooth_long_scene.html"),
+    },
+    "dynamic_splash": {
+        "size": 64,
+        "steps": 720,
+        "frame_every": 2,
+        "pressure_iters": 18,
+        "fps": 24.0,
+        "max_surface_points": 64,
+        "force_strength": 5.8,
+        "force_radius": 0.15,
+        "wave_speed": 0.12,
+        "surface_coupling": 0.48,
+        "surface_damping": 1.05,
+        "surface_smoothing": 0.10,
+        "particle_spawn_per_frame": 28,
+        "max_particles": 700,
+        "splash_spawn_per_frame": 28,
+        "max_splash_particles": 650,
+        "splash_life": 0.50,
+        "splash_gravity": 2.40,
+        "splash_burst_max": 1.80,
+        "splash_spread": 0.085,
+        "vortex_spiral_count": 5,
+        "vortex_spiral_radius": 0.13,
+        "vortex_line_width": 7.0,
+        "max_vortex_markers": 90,
+        "output": Path("outputs/navier_stokes_free_surface_3d_dynamic_splash_scene.html"),
+    },
+    "vortex_focus": {
+        "size": 72,
+        "steps": 720,
+        "frame_every": 2,
+        "pressure_iters": 22,
+        "fps": 24.0,
+        "max_surface_points": 72,
+        "force_strength": 6.2,
+        "force_radius": 0.17,
+        "wave_speed": 0.11,
+        "surface_coupling": 0.55,
+        "surface_damping": 1.00,
+        "surface_smoothing": 0.09,
+        "particle_spawn_per_frame": 24,
+        "splash_spawn_per_frame": 18,
+        "max_splash_particles": 480,
+        "vortex_spiral_count": 7,
+        "vortex_spiral_points": 64,
+        "vortex_spiral_radius": 0.15,
+        "vortex_line_width": 8.0,
+        "max_vortex_markers": 130,
+        "output": Path("outputs/navier_stokes_free_surface_3d_vortex_focus_scene.html"),
+    },
+}
 
 
 def downsample(array: np.ndarray, max_points: int) -> np.ndarray:
@@ -775,6 +852,7 @@ def build_figure(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a Navier-Stokes driven 3D free-surface foam experiment.")
+    parser.add_argument("--scene", choices=tuple(SCENE_PRESETS), default="none", help="Reusable scene preset.")
     parser.add_argument("--quality", choices=("preview", "balanced", "final"), default="balanced", help="Output preset.")
     parser.add_argument("--size", type=int, default=288, help="Simulation grid size.")
     parser.add_argument("--steps", type=int, default=1080, help="Simulation steps.")
@@ -825,6 +903,18 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def arg_was_supplied(name: str, argv: list[str]) -> bool:
+    option = f"--{name.replace('_', '-')}"
+    return any(arg == option or arg.startswith(f"{option}=") for arg in argv)
+
+
+def apply_scene_preset(args: argparse.Namespace, argv: list[str]) -> None:
+    preset = SCENE_PRESETS[args.scene]
+    for key, value in preset.items():
+        if not arg_was_supplied(key, argv):
+            setattr(args, key, value)
+
+
 def apply_quality_preset(args: argparse.Namespace) -> None:
     if args.quality == "preview":
         args.size = min(args.size, 128)
@@ -848,6 +938,7 @@ def apply_quality_preset(args: argparse.Namespace) -> None:
 
 def main() -> None:
     args = parse_args()
+    apply_scene_preset(args, sys.argv[1:])
     apply_quality_preset(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")

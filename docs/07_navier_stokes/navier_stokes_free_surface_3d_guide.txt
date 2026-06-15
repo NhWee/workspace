@@ -48,6 +48,25 @@ algorithmic step toward white water driven by the fluid state.
 
 Important parameters
 --------------------
+--scene
+Reusable scene preset. Available values:
+
+none
+No scene preset. Use raw parameter defaults and command-line values.
+
+smooth_long
+Lightweight, longer, smoother playback.
+
+dynamic_splash
+More energetic initial flow, stronger splash particles, and visible vortex
+spirals.
+
+vortex_focus
+Emphasizes visible vortex spirals and high-vorticity regions.
+
+Scene presets can still be overridden. For example, --scene dynamic_splash
+--fps 30 keeps the dynamic_splash setup but changes playback FPS.
+
 --size
 Simulation resolution.
 
@@ -192,6 +211,10 @@ From the project root:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d
 
+Use a reusable scene preset:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --scene dynamic_splash
+
 Smoother output:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --frame-every 2 --frame-duration-ms 25
@@ -227,6 +250,10 @@ python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --size 6
 More dynamic initial flow, stronger splash, and visible vortex spirals:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --size 64 --steps 720 --frame-every 2 --pressure-iters 18 --max-surface-points 64 --force-strength 5.8 --force-radius 0.15 --wave-speed 0.12 --surface-coupling 0.48 --surface-damping 1.05 --surface-smoothing 0.10 --particle-spawn-per-frame 28 --splash-spawn-per-frame 28 --max-splash-particles 650 --splash-burst-max 1.8 --splash-spread 0.085 --vortex-spiral-count 5 --vortex-spiral-radius 0.13 --vortex-line-width 7
+
+The same direction using a preset:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --scene dynamic_splash
 
 How this connects to the final goal
 -----------------------------------
