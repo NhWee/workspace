@@ -67,6 +67,9 @@ Emphasizes visible vortex spirals and high-vorticity regions.
 Scene presets can still be overridden. For example, --scene dynamic_splash
 --fps 30 keeps the dynamic_splash setup but changes playback FPS.
 
+The smooth_long, dynamic_splash, and vortex_focus scene presets enable periodic
+forcing by default, so they keep receiving wave energy over time.
+
 --size
 Simulation resolution.
 
@@ -90,6 +93,29 @@ Strength of the rotating flow sources.
 
 --force-radius
 Radius of the rotating flow sources.
+
+--periodic-force / --no-periodic-force
+Turns repeating external wave forcing on or off. This keeps injecting wave
+energy from one side so the state does not rely only on the initial condition.
+
+--periodic-force-strength
+Horizontal strength of the repeating external wave forcing.
+
+--periodic-surface-strength
+Vertical strength applied to the free-surface motion.
+
+--periodic-wavelength
+Wavelength of the incoming periodic forcing pattern.
+
+--periodic-period
+Temporal period of the incoming wave forcing. Lower values make incoming waves
+arrive faster.
+
+--periodic-direction-degrees
+Direction of the incoming wave forcing.
+
+--periodic-inlet-width
+Width of the side region where the periodic wave enters the domain.
 
 --wave-speed
 How quickly surface height ripples propagate.
@@ -254,6 +280,10 @@ python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --fps 24 --size 6
 The same direction using a preset:
 
 python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --scene dynamic_splash
+
+Incoming periodic waves with a calmer scene:
+
+python -m wave_sim.navier_stokes.navier_stokes_free_surface_3d --scene smooth_long --periodic-force --periodic-surface-strength 0.035 --periodic-period 1.7
 
 How this connects to the final goal
 -----------------------------------

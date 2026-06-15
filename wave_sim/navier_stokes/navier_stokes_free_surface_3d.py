@@ -6,6 +6,8 @@
 # You can handle the parameters
 # size, steps, frame_every, dt, viscosity, pressure_iters, force_strength,
 # force_radius, wave_speed, surface_coupling, surface_damping, eta_scale,
+# periodic_force, periodic_force_strength, periodic_surface_strength,
+# periodic_wavelength, periodic_period, periodic_direction_degrees,
 # foam_vorticity_threshold, foam_speed_threshold, foam_birth, foam_decay,
 # surface_smoothing, max_eta_velocity, foam_particles, particle_life,
 # particle_spawn_per_frame, max_particles, splash_particles,
@@ -56,6 +58,11 @@ SCENE_PRESETS = {
         "surface_coupling": 0.35,
         "surface_damping": 1.20,
         "surface_smoothing": 0.12,
+        "periodic_force": True,
+        "periodic_force_strength": 0.18,
+        "periodic_surface_strength": 0.030,
+        "periodic_wavelength": 0.62,
+        "periodic_period": 1.65,
         "output": Path("outputs/navier_stokes_free_surface_3d_smooth_long_scene.html"),
     },
     "dynamic_splash": {
@@ -71,6 +78,11 @@ SCENE_PRESETS = {
         "surface_coupling": 0.48,
         "surface_damping": 1.05,
         "surface_smoothing": 0.10,
+        "periodic_force": True,
+        "periodic_force_strength": 0.22,
+        "periodic_surface_strength": 0.040,
+        "periodic_wavelength": 0.58,
+        "periodic_period": 1.45,
         "particle_spawn_per_frame": 28,
         "max_particles": 700,
         "splash_spawn_per_frame": 28,
@@ -98,6 +110,11 @@ SCENE_PRESETS = {
         "surface_coupling": 0.55,
         "surface_damping": 1.00,
         "surface_smoothing": 0.09,
+        "periodic_force": True,
+        "periodic_force_strength": 0.20,
+        "periodic_surface_strength": 0.034,
+        "periodic_wavelength": 0.55,
+        "periodic_period": 1.50,
         "particle_spawn_per_frame": 24,
         "splash_spawn_per_frame": 18,
         "max_splash_particles": 480,
@@ -196,6 +213,56 @@ def make_initial_velocity(size: int, device: torch.device, strength: float, radi
     return u, v
 
 
+def periodic_wave_phase(
+    xx: torch.Tensor,
+    yy: torch.Tensor,
+    step: int,
+    dt: float,
+    wavelength: float,
+    period: float,
+    direction_degrees: float,
+) -> torch.Tensor:
+    theta = np.deg2rad(direction_degrees)
+    direction_x = np.cos(theta)
+    direction_y = np.sin(theta)
+    coordinate = xx * direction_x + yy * direction_y
+    return 2.0 * np.pi * (coordinate / max(wavelength, 1.0e-6) - (step * dt) / max(period, 1.0e-6))
+
+
+def add_periodic_wave_forcing(
+    u: torch.Tensor,
+    v: torch.Tensor,
+    eta_velocity: torch.Tensor,
+    xx: torch.Tensor,
+    yy: torch.Tensor,
+    step: int,
+    dt: float,
+    force_strength: float,
+    surface_strength: float,
+    wavelength: float,
+    period: float,
+    direction_degrees: float,
+    inlet_width: float,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    if force_strength <= 0.0 and surface_strength <= 0.0:
+        return u, v, eta_velocity
+
+    theta = np.deg2rad(direction_degrees)
+    direction_x = np.cos(theta)
+    direction_y = np.sin(theta)
+    phase = periodic_wave_phase(xx, yy, step, dt, wavelength, period, direction_degrees)
+    coordinate = xx * direction_x + yy * direction_y
+    inlet = torch.exp(-((coordinate - 0.08) ** 2) / max(inlet_width * inlet_width, 1.0e-6))
+    lateral = torch.exp(-((yy - 0.5) ** 2) / 0.28)
+    envelope = inlet * (0.35 + 0.65 * lateral)
+    wave = torch.sin(phase)
+
+    u = u + direction_x * force_strength * wave * envelope * dt
+    v = v + direction_y * force_strength * wave * envelope * dt
+    eta_velocity = eta_velocity + surface_strength * wave * envelope * dt
+    return u, v, eta_velocity
+
+
 def update_surface(
     eta: torch.Tensor,
     eta_velocity: torch.Tensor,
@@ -208,6 +275,7 @@ def update_surface(
     surface_damping: float,
     surface_smoothing: float,
     max_eta_velocity: float,
+    periodic_acceleration: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     eta = advect(eta, u, v, dt)
     eta_velocity = advect(eta_velocity, u, v, dt)
@@ -219,6 +287,8 @@ def update_surface(
 
     acceleration = wave_speed * wave_speed * laplacian(eta, dx)
     acceleration = acceleration + surface_coupling * swirl_source
+    if periodic_acceleration is not None:
+        acceleration = acceleration + periodic_acceleration
     acceleration = acceleration - surface_damping * eta_velocity
     eta_velocity = eta_velocity + acceleration * dt
     if max_eta_velocity > 0.0:
@@ -478,6 +548,13 @@ def simulate_free_surface(
     pressure_iters: int,
     force_strength: float,
     force_radius: float,
+    periodic_force: bool,
+    periodic_force_strength: float,
+    periodic_surface_strength: float,
+    periodic_wavelength: float,
+    periodic_period: float,
+    periodic_direction_degrees: float,
+    periodic_inlet_width: float,
     wave_speed: float,
     surface_coupling: float,
     surface_damping: float,
@@ -525,6 +602,28 @@ def simulate_free_surface(
         u = advect(u, u, v, dt)
         v = advect(v, u, v, dt)
         u, v = add_vortex_forces(u, v, xx, yy, step, dt, force_strength, force_radius)
+        periodic_acceleration = None
+        if periodic_force:
+            phase = periodic_wave_phase(xx, yy, step, dt, periodic_wavelength, periodic_period, periodic_direction_degrees)
+            theta = np.deg2rad(periodic_direction_degrees)
+            coordinate = xx * np.cos(theta) + yy * np.sin(theta)
+            inlet = torch.exp(-((coordinate - 0.08) ** 2) / max(periodic_inlet_width * periodic_inlet_width, 1.0e-6))
+            periodic_acceleration = periodic_surface_strength * torch.sin(phase) * inlet
+            u, v, eta_velocity = add_periodic_wave_forcing(
+                u,
+                v,
+                eta_velocity,
+                xx,
+                yy,
+                step,
+                dt,
+                periodic_force_strength,
+                periodic_surface_strength,
+                periodic_wavelength,
+                periodic_period,
+                periodic_direction_degrees,
+                periodic_inlet_width,
+            )
 
         if viscosity > 0.0:
             u = u + viscosity * laplacian(u, dx) * dt
@@ -543,6 +642,7 @@ def simulate_free_surface(
             surface_damping,
             surface_smoothing,
             max_eta_velocity,
+            periodic_acceleration,
         )
         foam = update_foam(
             foam,
@@ -862,6 +962,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pressure-iters", type=int, default=60, help="Jacobi pressure projection iterations.")
     parser.add_argument("--force-strength", type=float, default=4.4, help="Strength of rotating vortex force sources.")
     parser.add_argument("--force-radius", type=float, default=0.12, help="Radius of rotating vortex force sources.")
+    parser.add_argument("--periodic-force", action=argparse.BooleanOptionalAction, default=False, help="Apply repeating external wave forcing from one side.")
+    parser.add_argument("--periodic-force-strength", type=float, default=0.18, help="Horizontal periodic forcing strength.")
+    parser.add_argument("--periodic-surface-strength", type=float, default=0.030, help="Vertical free-surface periodic forcing strength.")
+    parser.add_argument("--periodic-wavelength", type=float, default=0.62, help="Wavelength of the external forcing pattern.")
+    parser.add_argument("--periodic-period", type=float, default=1.60, help="Temporal period of the external forcing pattern.")
+    parser.add_argument("--periodic-direction-degrees", type=float, default=0.0, help="Direction of periodic forcing in degrees.")
+    parser.add_argument("--periodic-inlet-width", type=float, default=0.20, help="Width of the side inlet region for periodic forcing.")
     parser.add_argument("--wave-speed", type=float, default=0.18, help="Free-surface wave propagation speed.")
     parser.add_argument("--surface-coupling", type=float, default=0.55, help="How strongly vortices disturb the surface.")
     parser.add_argument("--surface-damping", type=float, default=0.85, help="Damping applied to vertical surface velocity.")
@@ -954,6 +1061,13 @@ def main() -> None:
         pressure_iters=args.pressure_iters,
         force_strength=args.force_strength,
         force_radius=args.force_radius,
+        periodic_force=args.periodic_force,
+        periodic_force_strength=args.periodic_force_strength,
+        periodic_surface_strength=args.periodic_surface_strength,
+        periodic_wavelength=args.periodic_wavelength,
+        periodic_period=args.periodic_period,
+        periodic_direction_degrees=args.periodic_direction_degrees,
+        periodic_inlet_width=args.periodic_inlet_width,
         wave_speed=args.wave_speed,
         surface_coupling=args.surface_coupling,
         surface_damping=args.surface_damping,
