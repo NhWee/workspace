@@ -32,7 +32,6 @@ from wave_sim.navier_stokes.navier_stokes_foam_2d import (
     laplacian,
     make_grid,
     project_velocity,
-    update_foam,
 )
 
 
@@ -173,6 +172,11 @@ def normalize01(field: torch.Tensor) -> torch.Tensor:
     return (field - field_min) / torch.clamp(field_max - field_min, min=1.0e-6)
 
 
+def smoothstep_torch(field: torch.Tensor) -> torch.Tensor:
+    field = torch.clamp(field, 0.0, 1.0)
+    return field * field * (3.0 - 2.0 * field)
+
+
 @dataclass
 class FoamParticles:
     x: torch.Tensor
@@ -278,6 +282,29 @@ def update_streak(streak: torch.Tensor, u: torch.Tensor, v: torch.Tensor, source
     streak = advect(streak, u, v, dt)
     streak = streak * np.exp(-decay * dt) + source * birth * dt
     return torch.clamp(streak, 0.0, 1.0)
+
+
+def update_surface_foam(
+    foam: torch.Tensor,
+    u: torch.Tensor,
+    v: torch.Tensor,
+    eta: torch.Tensor,
+    vorticity: torch.Tensor,
+    speed: torch.Tensor,
+    wake: torch.Tensor,
+    dt: float,
+    foam_birth: float,
+    foam_decay: float,
+) -> torch.Tensor:
+    foam = advect(foam, u, v, dt)
+    eta_std = torch.clamp(torch.std(eta), min=1.0e-6)
+    crest = smoothstep_torch((eta - torch.mean(eta)) / (1.15 * eta_std))
+    energetic = smoothstep_torch(0.58 * normalize01(speed) + 0.42 * normalize01(torch.abs(vorticity)))
+    breaking_source = crest * energetic
+    source = torch.clamp(0.68 * breaking_source + 0.55 * wake, 0.0, 1.0)
+    foam = foam * np.exp(-foam_decay * dt) + foam_birth * source * dt
+    foam = smooth_field(foam, 0.035)
+    return torch.clamp(foam, 0.0, 1.0)
 
 
 def make_initial_eta(size: int, device: torch.device) -> torch.Tensor:
@@ -758,25 +785,23 @@ def simulate_free_surface(
             max_eta_velocity,
             periodic_acceleration,
         )
-        foam = update_foam(
-            foam,
-            u,
-            v,
-            dx,
-            dt,
-            foam_vorticity_threshold,
-            foam_speed_threshold,
-            foam_birth,
-            foam_decay,
-        )
-        crest = torch.relu((eta - torch.mean(eta)) / torch.clamp(torch.std(eta), min=1.0e-6))
         vorticity = curl_z(u, v, dx)
         speed = torch.sqrt(u * u + v * v)
         wake = obstacle_wake_source(xx, yy, u, v, solid, obstacle_x, obstacle_y, obstacle_radius)
         streak_source = normalize01(torch.abs(vorticity)) * normalize01(speed) + obstacle_wake_strength * wake
         streak = update_streak(streak, u, v, torch.clamp(streak_source, 0.0, 1.0), dt, streak_decay, streak_strength)
-        foam = torch.clamp(torch.maximum(foam, 0.12 * normalize01(crest)), 0.0, 1.0)
-        foam = torch.clamp(torch.maximum(foam, 0.35 * wake), 0.0, 1.0)
+        foam = update_surface_foam(
+            foam,
+            u,
+            v,
+            eta,
+            vorticity,
+            speed,
+            wake,
+            dt,
+            foam_birth,
+            foam_decay,
+        )
         if foam_particles:
             particles = step_foam_particles(
                 particles,
@@ -817,12 +842,11 @@ def simulate_free_surface(
             y = (yy - 0.5).detach().cpu().numpy().astype(np.float32)
             z = (eta * eta_scale).detach().cpu().numpy().astype(np.float32)
             foam_np = foam.detach().cpu().numpy().astype(np.float32)
-            streak_np = streak.detach().cpu().numpy().astype(np.float32)
             frames.append((
                 downsample(x, max_surface_points),
                 downsample(y, max_surface_points),
                 downsample(z, max_surface_points),
-                downsample(np.clip(foam_np + 0.45 * streak_np, 0.0, 1.0), max_surface_points),
+                downsample(foam_np, max_surface_points),
                 particle_frame(particles, eta, eta_scale, particle_height) if foam_particles else particle_frame(empty_particles(device), eta, eta_scale, particle_height),
                 splash_frame(splash, eta_scale) if splash_particles else splash_frame(empty_splash_particles(device), eta_scale),
                 vortex_marker_frame(xx, yy, eta, vorticity, speed, eta_scale, max_vortex_markers) if vortex_markers else vortex_marker_frame(xx, yy, eta, vorticity, speed, eta_scale, 0),
