@@ -8,6 +8,7 @@
 # force_radius, wave_speed, surface_coupling, surface_damping, eta_scale,
 # periodic_force, periodic_force_strength, periodic_surface_strength,
 # periodic_wavelength, periodic_period, periodic_direction_degrees,
+# initial_mode, initial_vortex_boost, initial_shear_strength,
 # foam_vorticity_threshold, foam_speed_threshold, foam_birth, foam_decay,
 # surface_smoothing, max_eta_velocity, foam_particles, particle_life,
 # particle_spawn_per_frame, max_particles, splash_particles,
@@ -158,6 +159,45 @@ SCENE_PRESETS = {
         "max_vortex_markers": 130,
         "output": Path("outputs/navier_stokes_free_surface_3d_vortex_focus_scene.html"),
     },
+    "vortex_rollup": {
+        "size": 80,
+        "steps": 900,
+        "frame_every": 2,
+        "pressure_iters": 28,
+        "fps": 24.0,
+        "max_surface_points": 80,
+        "initial_mode": "vortex_rollup",
+        "initial_vortex_boost": 2.25,
+        "initial_shear_strength": 0.85,
+        "force_strength": 6.8,
+        "force_radius": 0.18,
+        "wave_speed": 0.12,
+        "surface_coupling": 0.62,
+        "surface_damping": 0.95,
+        "surface_smoothing": 0.08,
+        "periodic_force": True,
+        "periodic_force_strength": 0.18,
+        "periodic_surface_strength": 0.028,
+        "periodic_wavelength": 0.58,
+        "periodic_period": 1.55,
+        "periodic_direction_degrees": 8.0,
+        "vorticity_confinement": 0.32,
+        "streak_strength": 0.42,
+        "streak_decay": 0.36,
+        "foam_birth": 2.8,
+        "foam_decay": 0.38,
+        "particle_spawn_per_frame": 36,
+        "max_particles": 950,
+        "particle_life": 1.10,
+        "splash_spawn_per_frame": 18,
+        "max_splash_particles": 520,
+        "splash_life": 0.48,
+        "splash_burst_max": 1.65,
+        "splash_spread": 0.080,
+        "vortex_markers": False,
+        "vortex_spirals": False,
+        "output": Path("outputs/navier_stokes_free_surface_3d_vortex_rollup_scene.html"),
+    },
 }
 
 
@@ -307,7 +347,7 @@ def update_surface_foam(
     return torch.clamp(foam, 0.0, 1.0)
 
 
-def make_initial_eta(size: int, device: torch.device) -> torch.Tensor:
+def make_initial_eta(size: int, device: torch.device, initial_mode: str) -> torch.Tensor:
     xx, yy = make_grid(size, device)
     crest_a = 1.25 * torch.exp(-((xx - 0.30) ** 2 + (yy - 0.44) ** 2) / 0.010)
     trough_a = -1.05 * torch.exp(-((xx - 0.42) ** 2 + (yy - 0.56) ** 2) / 0.013)
@@ -315,27 +355,56 @@ def make_initial_eta(size: int, device: torch.device) -> torch.Tensor:
     trough_b = -0.85 * torch.exp(-((xx - 0.59) ** 2 + (yy - 0.43) ** 2) / 0.015)
     crossing_ripples = 0.22 * torch.sin(10.0 * np.pi * xx + 2.5 * torch.sin(2.0 * np.pi * yy))
     diagonal_ripples = 0.14 * torch.sin(7.0 * np.pi * (xx + yy))
-    return 0.045 * (crest_a + trough_a + crest_b + trough_b + crossing_ripples + diagonal_ripples)
+    eta = crest_a + trough_a + crest_b + trough_b + crossing_ripples + diagonal_ripples
+    if initial_mode == "vortex_rollup":
+        rollup_ring = torch.exp(-(((xx - 0.50) ** 2 + (yy - 0.50) ** 2) - 0.060) ** 2 / 0.0018)
+        rolled_crest = 1.15 * torch.exp(-((xx - 0.40) ** 2 + (yy - 0.52) ** 2) / 0.008)
+        rolled_trough = -1.10 * torch.exp(-((xx - 0.60) ** 2 + (yy - 0.48) ** 2) / 0.008)
+        braided_ripples = 0.24 * torch.sin(13.0 * np.pi * (xx - 0.18 * torch.sin(2.0 * np.pi * yy)))
+        eta = 1.22 * eta + 0.55 * rollup_ring + rolled_crest + rolled_trough + braided_ripples
+    return 0.045 * eta
 
 
-def make_initial_velocity(size: int, device: torch.device, strength: float, radius: float) -> tuple[torch.Tensor, torch.Tensor]:
+def make_initial_velocity(
+    size: int,
+    device: torch.device,
+    strength: float,
+    radius: float,
+    initial_mode: str,
+    vortex_boost: float,
+    shear_strength: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
     xx, yy = make_grid(size, device)
     u = torch.zeros((size, size), device=device)
     v = torch.zeros((size, size), device=device)
-    vortices = [
-        (0.32, 0.46, 1.35),
-        (0.68, 0.54, -1.25),
-        (0.50, 0.32, 0.70),
-    ]
+    if initial_mode == "vortex_rollup":
+        vortices = [
+            (0.37, 0.50, 2.10),
+            (0.63, 0.50, -2.05),
+            (0.47, 0.34, -1.10),
+            (0.53, 0.66, 1.00),
+            (0.28, 0.62, 0.75),
+            (0.72, 0.38, -0.75),
+        ]
+        radius = radius * 1.12
+    else:
+        vortices = [
+            (0.32, 0.46, 1.35),
+            (0.68, 0.54, -1.25),
+            (0.50, 0.32, 0.70),
+        ]
     for cx, cy, spin in vortices:
         dx = xx - cx
         dy = yy - cy
         r2 = dx * dx + dy * dy
         weight = torch.exp(-r2 / max(radius * radius, 1.0e-6))
-        u = u + spin * (-dy) * weight * strength
-        v = v + spin * dx * weight * strength
+        u = u + vortex_boost * spin * (-dy) * weight * strength
+        v = v + vortex_boost * spin * dx * weight * strength
     shear = torch.exp(-((yy - 0.5) ** 2) / 0.05)
-    u = u + 0.28 * strength * shear * torch.sin(2.0 * np.pi * yy)
+    u = u + shear_strength * strength * shear * torch.sin(2.0 * np.pi * yy)
+    if initial_mode == "vortex_rollup":
+        counter_shear = torch.exp(-((xx - 0.5) ** 2) / 0.035)
+        v = v + 0.42 * shear_strength * strength * counter_shear * torch.sin(2.0 * np.pi * xx)
     return u, v
 
 
@@ -674,6 +743,9 @@ def simulate_free_surface(
     pressure_iters: int,
     force_strength: float,
     force_radius: float,
+    initial_mode: str,
+    initial_vortex_boost: float,
+    initial_shear_strength: float,
     periodic_force: bool,
     periodic_force_strength: float,
     periodic_surface_strength: float,
@@ -726,9 +798,17 @@ def simulate_free_surface(
     dx = 1.0 / size
     xx, yy = make_grid(size, device)
     solid, fluid = obstacle_fields(xx, yy, obstacle, obstacle_x, obstacle_y, obstacle_radius, obstacle_edge_width)
-    u, v = make_initial_velocity(size, device, force_strength, force_radius * 1.35)
+    u, v = make_initial_velocity(
+        size,
+        device,
+        force_strength,
+        force_radius * 1.35,
+        initial_mode,
+        initial_vortex_boost,
+        initial_shear_strength,
+    )
     u, v = apply_obstacle_velocity(u, v, solid, fluid)
-    eta = make_initial_eta(size, device)
+    eta = make_initial_eta(size, device, initial_mode)
     eta_velocity = torch.zeros_like(eta)
     foam = torch.zeros_like(eta)
     streak = torch.zeros_like(eta)
@@ -1133,6 +1213,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pressure-iters", type=int, default=60, help="Jacobi pressure projection iterations.")
     parser.add_argument("--force-strength", type=float, default=4.4, help="Strength of rotating vortex force sources.")
     parser.add_argument("--force-radius", type=float, default=0.12, help="Radius of rotating vortex force sources.")
+    parser.add_argument("--initial-mode", choices=("standard", "vortex_rollup"), default="standard", help="Initial surface/velocity pattern.")
+    parser.add_argument("--initial-vortex-boost", type=float, default=1.0, help="Multiplier for vortices in the initial velocity field.")
+    parser.add_argument("--initial-shear-strength", type=float, default=0.28, help="Strength of the initial shear flow.")
     parser.add_argument("--periodic-force", action=argparse.BooleanOptionalAction, default=False, help="Apply repeating external wave forcing from one side.")
     parser.add_argument("--periodic-force-strength", type=float, default=0.18, help="Horizontal periodic forcing strength.")
     parser.add_argument("--periodic-surface-strength", type=float, default=0.030, help="Vertical free-surface periodic forcing strength.")
@@ -1241,6 +1324,9 @@ def main() -> None:
         pressure_iters=args.pressure_iters,
         force_strength=args.force_strength,
         force_radius=args.force_radius,
+        initial_mode=args.initial_mode,
+        initial_vortex_boost=args.initial_vortex_boost,
+        initial_shear_strength=args.initial_shear_strength,
         periodic_force=args.periodic_force,
         periodic_force_strength=args.periodic_force_strength,
         periodic_surface_strength=args.periodic_surface_strength,

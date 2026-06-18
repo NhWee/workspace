@@ -64,6 +64,12 @@ are off by default for a more realistic view.
 vortex_focus
 Emphasizes visible vortex spirals and high-vorticity regions.
 
+vortex_rollup
+Starts from a stronger counter-rotating vortex pair and shear layer, then keeps
+feeding the domain with mild periodic wave forcing. This is the recommended
+scene when you want to see real swirling motion without turning on artificial
+vortex marker lines.
+
 rock_wake
 Incoming waves hit a circular rock obstacle and create wake, streaks, foam, and
 splash. This is the recommended scene for a more turbulent realistic view.
@@ -97,6 +103,19 @@ Strength of the rotating flow sources.
 
 --force-radius
 Radius of the rotating flow sources.
+
+--initial-mode
+Initial surface and velocity pattern. standard is calmer. vortex_rollup starts
+with a stronger counter-rotating vortex pair so swirl is visible from the
+beginning.
+
+--initial-vortex-boost
+Multiplier for the initial vortex field. Increase this when the first seconds
+look too calm.
+
+--initial-shear-strength
+Strength of the initial shear layer. Higher values make the vortex pair roll up
+more aggressively, but too high can make the surface noisy.
 
 --periodic-force / --no-periodic-force
 Turns repeating external wave forcing on or off. This keeps injecting wave
