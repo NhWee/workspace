@@ -68,7 +68,8 @@ vortex_rollup
 Starts from a stronger counter-rotating vortex pair and shear layer, then keeps
 feeding the domain with mild periodic wave forcing. This is the recommended
 scene when you want to see real swirling motion without turning on artificial
-vortex marker lines.
+vortex marker lines. It also uses a lower-damping surface and advected surface
+streaks so the rotating flow is visible in the water color.
 
 rock_wake
 Incoming waves hit a circular rock obstacle and create wake, streaks, foam, and
@@ -155,7 +156,9 @@ Adds energy back into vortices so turbulent structures remain visible longer.
 
 --streak-strength
 Strength of the advected surface streak texture. This makes the flow direction
-more visible without adding analysis marker lines.
+more visible without adding analysis marker lines. In the 3D viewer, this
+streak is mixed subtly into the surface color; it does not spawn foam
+particles by itself.
 
 --streak-decay
 How quickly the advected streak texture fades.
@@ -181,10 +184,12 @@ Use 0 to disable the clamp.
 Visual vertical scale of the rendered surface.
 
 --foam-vorticity-threshold
-How much swirl is needed before foam appears.
+How much swirl is needed before foam appears. Higher values make foam more
+selective and sparse.
 
 --foam-speed-threshold
-How much speed is needed before foam appears.
+How much speed is needed before foam appears. Higher values prevent slow,
+calm regions from turning white.
 
 --foam-birth
 How quickly foam is created.

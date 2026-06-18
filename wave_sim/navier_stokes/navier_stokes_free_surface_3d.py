@@ -171,10 +171,12 @@ SCENE_PRESETS = {
         "initial_shear_strength": 0.85,
         "force_strength": 6.8,
         "force_radius": 0.18,
-        "wave_speed": 0.12,
-        "surface_coupling": 0.62,
-        "surface_damping": 0.95,
-        "surface_smoothing": 0.08,
+        "wave_speed": 0.16,
+        "surface_coupling": 0.90,
+        "surface_damping": 0.55,
+        "surface_smoothing": 0.018,
+        "max_eta_velocity": 0.24,
+        "eta_scale": 1.15,
         "periodic_force": True,
         "periodic_force_strength": 0.18,
         "periodic_surface_strength": 0.028,
@@ -184,7 +186,9 @@ SCENE_PRESETS = {
         "vorticity_confinement": 0.32,
         "streak_strength": 0.42,
         "streak_decay": 0.36,
-        "foam_birth": 2.8,
+        "foam_vorticity_threshold": 24.0,
+        "foam_speed_threshold": 1.70,
+        "foam_birth": 3.2,
         "foam_decay": 0.38,
         "particle_spawn_per_frame": 36,
         "max_particles": 950,
@@ -333,17 +337,21 @@ def update_surface_foam(
     speed: torch.Tensor,
     wake: torch.Tensor,
     dt: float,
+    foam_vorticity_threshold: float,
+    foam_speed_threshold: float,
     foam_birth: float,
     foam_decay: float,
 ) -> torch.Tensor:
     foam = advect(foam, u, v, dt)
     eta_std = torch.clamp(torch.std(eta), min=1.0e-6)
-    crest = smoothstep_torch((eta - torch.mean(eta)) / (1.15 * eta_std))
-    energetic = smoothstep_torch(0.58 * normalize01(speed) + 0.42 * normalize01(torch.abs(vorticity)))
+    crest = smoothstep_torch((eta - torch.mean(eta) - 0.10 * eta_std) / (1.10 * eta_std))
+    vortex_source = smoothstep_torch((torch.abs(vorticity) - foam_vorticity_threshold) / max(1.75 * foam_vorticity_threshold, 1.0e-6))
+    speed_source = smoothstep_torch((speed - foam_speed_threshold) / max(1.50 * foam_speed_threshold, 1.0e-6))
+    energetic = torch.sqrt(torch.clamp(vortex_source * speed_source, 0.0, 1.0))
     breaking_source = crest * energetic
     source = torch.clamp(0.68 * breaking_source + 0.55 * wake, 0.0, 1.0)
     foam = foam * np.exp(-foam_decay * dt) + foam_birth * source * dt
-    foam = smooth_field(foam, 0.035)
+    foam = smooth_field(foam, 0.025)
     return torch.clamp(foam, 0.0, 1.0)
 
 
@@ -879,6 +887,8 @@ def simulate_free_surface(
             speed,
             wake,
             dt,
+            foam_vorticity_threshold,
+            foam_speed_threshold,
             foam_birth,
             foam_decay,
         )
@@ -922,11 +932,13 @@ def simulate_free_surface(
             y = (yy - 0.5).detach().cpu().numpy().astype(np.float32)
             z = (eta * eta_scale).detach().cpu().numpy().astype(np.float32)
             foam_np = foam.detach().cpu().numpy().astype(np.float32)
+            streak_np = streak.detach().cpu().numpy().astype(np.float32)
+            surface_activity = np.clip(foam_np + 0.28 * streak_np, 0.0, 1.0).astype(np.float32)
             frames.append((
                 downsample(x, max_surface_points),
                 downsample(y, max_surface_points),
                 downsample(z, max_surface_points),
-                downsample(foam_np, max_surface_points),
+                downsample(surface_activity, max_surface_points),
                 particle_frame(particles, eta, eta_scale, particle_height) if foam_particles else particle_frame(empty_particles(device), eta, eta_scale, particle_height),
                 splash_frame(splash, eta_scale) if splash_particles else splash_frame(empty_splash_particles(device), eta_scale),
                 vortex_marker_frame(xx, yy, eta, vorticity, speed, eta_scale, max_vortex_markers) if vortex_markers else vortex_marker_frame(xx, yy, eta, vorticity, speed, eta_scale, 0),
@@ -1069,15 +1081,12 @@ def frame_z_limit(
     frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]],
 ) -> float:
     z_values = []
-    for _x, _y, z, _foam, particles, splash, vortex, spiral in frames:
-        z_values.append(np.abs(z).ravel())
-        for layer in (particles, splash, vortex, spiral):
-            if len(layer[2]) > 0:
-                z_values.append(np.abs(layer[2][np.isfinite(layer[2])]).ravel())
+    for _x, _y, z, _foam, _particles, _splash, _vortex, _spiral in frames:
+        z_values.append(np.abs(z[np.isfinite(z)]).ravel())
     finite = np.concatenate([values for values in z_values if len(values) > 0])
     if len(finite) == 0:
         return 0.02
-    return max(float(np.max(finite)) * 1.20, 0.02)
+    return max(float(np.quantile(finite, 0.995)) * 1.45, 0.02)
 
 
 def build_figure(
