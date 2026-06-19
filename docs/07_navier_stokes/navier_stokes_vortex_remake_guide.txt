@@ -1,0 +1,110 @@
+Navier-Stokes vortex remake guide
+=================================
+
+Files
+-----
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\wave_sim\navier_stokes\navier_stokes_vortex_remake.py
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\outputs\navier_stokes_vortex_remake.html
+
+What this remake is
+-------------------
+This is a clean real-time remake based on the earlier Navier-Stokes,
+free-surface, foam, spray, and vortex experiments.
+
+The earlier Plotly viewers were useful for saved animation output, but they
+were heavy and harder to tune interactively. This remake writes one standalone
+HTML file with a Canvas-based real-time viewer.
+
+It keeps the same core idea:
+
+1. solve a 2D incompressible velocity field
+2. couple that velocity field to a free-surface height field eta
+3. generate foam from strong curl, speed, and elevated crests
+4. emit spray particles from energetic breaking regions
+5. render the result as a 3D-looking height-field surface
+
+Equations
+---------
+Horizontal fluid:
+
+du/dt + (u dot grad)u = -grad(p) + viscosity * laplacian(u) + force
+div(u) = 0
+
+Free surface:
+
+d2 eta/dt2 =
+    wave_speed^2 * laplacian(eta)
+    + surface_coupling * abs(curl)
+    + speed forcing
+    - damping * d eta/dt
+
+Foam:
+
+foam is advected by the flow, decays over time, and is born from:
+
+1. high vorticity
+2. high speed
+3. raised wave crests
+
+What changed from the previous viewer
+-------------------------------------
+The initial condition is much more energetic. It starts with a stronger
+counter-rotating vortex pair plus extra secondary vortices.
+
+The viewer is real-time. You can drag on the water to inject velocity and make
+new local vortices.
+
+The controls are directly tied to visible parameters:
+
+Wind
+Strength of incoming wave forcing from the left side.
+
+Vortex
+Strength of the moving vortex paddles.
+
+Wave
+How fast the height-field wave equation propagates.
+
+Coupling
+How strongly curl/speed disturb the free surface.
+
+Viscosity
+Higher values smooth out vortices. Lower values keep sharper swirl.
+
+Foam
+Foam birth rate from breaking/vortex regions.
+
+Buttons
+-------
+Pause
+Stops or resumes the real-time simulation.
+
+Reset
+Creates a fresh simulation state.
+
+Kick Vortices
+Injects a new strong counter-rotating vortex pair.
+
+Flow Off / Flow On
+Toggles velocity arrows.
+
+Swirl Overlay Off / On
+Toggles the visual curl rings. These are not the physical fluid itself; they
+are a diagnostic overlay to help read rotating regions.
+
+Run command
+-----------
+From the project root:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.navier_stokes_vortex_remake
+
+Then open:
+
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\outputs\navier_stokes_vortex_remake.html
+
+Limitations
+-----------
+This is still not full volumetric 3D CFD. It is a 2D incompressible flow plus a
+3D-looking height field. It is useful for quickly seeing vortex-driven waves,
+foam, and spray, but it cannot model overturning waves, enclosed air bubbles,
+or true 3D turbulence.
