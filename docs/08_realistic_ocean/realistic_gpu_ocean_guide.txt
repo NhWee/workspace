@@ -1,0 +1,121 @@
+Realistic GPU ocean viewer guide
+================================
+
+Files
+-----
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\wave_sim\spectral_wave\realistic_ocean_gpu_viewer.py
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\outputs\realistic_gpu_ocean.html
+
+Why this direction
+------------------
+On the current machine, the most realistic interactive fluid result is not a
+full 3D Navier-Stokes air-water simulation. Full volumetric 3D CFD with foam,
+spray, overturning waves, and high-resolution rendering is too expensive for
+real-time work on an RTX 4060 Ti.
+
+The practical high-realism direction is:
+
+1. simulate the visible free surface
+2. use a choppy multi-wave spectrum for ocean motion
+3. add crest foam and spray
+4. shade the surface with sun/sky lighting
+5. keep the scene interactive in WebGL
+
+This is the same basic strategy used by many real-time ocean renderers: spend
+the GPU budget on the surface that the viewer sees.
+
+Model
+-----
+The ocean surface is a 2.5D height/displacement field:
+
+position(x, z, t) =
+    base_position
+    + horizontal_choppy_displacement
+    + vertical_wave_height
+
+The wave field is made from multiple Gerstner-like components:
+
+height += amplitude * sin(k * dot(direction, position) - omega * t + phase)
+horizontal displacement += steepness * amplitude * direction * cos(phase)
+
+Foam is generated from:
+
+1. sharp crests
+2. steep slopes
+3. moving vortex/wake centers
+
+Spray particles are emitted from high-foam breaking regions and then move
+ballistically under gravity.
+
+Controls
+--------
+Wind
+Controls wave forcing and travel speed. Higher values make the ocean more
+energetic.
+
+Choppiness
+Controls horizontal displacement. Higher values create sharper, more folded
+wave crests.
+
+Swell
+Controls large-scale wave amplitude.
+
+Foam
+Controls crest/wake foam intensity.
+
+Spray
+Controls the amount of airborne spray particles.
+
+Sun
+Controls sunlight and highlight intensity.
+
+Buttons
+-------
+Pause
+Stops or resumes the viewer.
+
+Storm preset
+Sets wind, choppiness, swell, foam, and spray higher.
+
+Calm preset
+Sets lower-energy ocean parameters.
+
+Spray Off / On
+Toggles airborne spray.
+
+Foam Off / On
+Toggles foam coloring on the water surface.
+
+Run command
+-----------
+From the project root:
+
+.\.venv\Scripts\python.exe -m wave_sim.spectral_wave.realistic_ocean_gpu_viewer
+
+Then open:
+
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\outputs\realistic_gpu_ocean.html
+
+Important note
+--------------
+The HTML uses Three.js from a CDN:
+
+https://unpkg.com/three@0.160.0/build/three.min.js
+
+So the first load needs internet access. After the browser caches it, repeated
+loads are usually fast.
+
+Limitations
+-----------
+This is not a full 3D fluid volume. It does not solve air-water interaction,
+bubble entrainment, or true breaking-wave topology. It is designed to produce
+the most realistic interactive water surface we can reasonably build in this
+workspace and hardware setup.
+
+Best next improvements
+----------------------
+1. Package Three.js locally so the viewer works offline.
+2. Add a real FFT/Tessendorf ocean spectrum instead of fixed Gerstner waves.
+3. Add reflection/refraction environment maps.
+4. Add shoreline or obstacle interaction.
+5. Export high-quality rendered frames for video.
