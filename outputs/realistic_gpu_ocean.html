@@ -90,9 +90,10 @@
       <label><span>Wind <output id="windValue"></output></span><input id="wind" type="range" min="0.25" max="2.5" step="0.01" value="1.25"></label>
       <label><span>Choppiness <output id="chopValue"></output></span><input id="chop" type="range" min="0.1" max="2.0" step="0.01" value="1.05"></label>
       <label><span>Swell <output id="swellValue"></output></span><input id="swell" type="range" min="0.2" max="2.2" step="0.01" value="1.0"></label>
-      <label><span>Foam <output id="foamValue"></output></span><input id="foam" type="range" min="0" max="2.2" step="0.01" value="1.0"></label>
+      <label><span>Foam <output id="foamValue"></output></span><input id="foam" type="range" min="0" max="2.2" step="0.01" value="0.70"></label>
       <label><span>Spray <output id="sprayValue"></output></span><input id="spray" type="range" min="0" max="2.0" step="0.01" value="0.85"></label>
       <label><span>Sun <output id="sunValue"></output></span><input id="sun" type="range" min="0" max="1" step="0.01" value="0.72"></label>
+      <label><span>Glint <output id="glintValue"></output></span><input id="glint" type="range" min="0" max="1.6" step="0.01" value="0.88"></label>
     </div>
     <div class="buttons">
       <button id="pause">Pause</button>
@@ -126,9 +127,10 @@
     wind: 1.25,
     chop: 1.05,
     swell: 1.0,
-    foam: 1.0,
+    foam: 0.70,
     spray: 0.85,
     sun: 0.72,
+    glint: 0.88,
     paused: false,
     showSpray: true,
     showFoam: true,
@@ -217,6 +219,9 @@
   const mid = new THREE.Color(0x08708f);
   const crest = new THREE.Color(0xaee8f5);
   const foamColor = new THREE.Color(0xffffff);
+  const reflectionColor = new THREE.Color(0x7ecfff);
+  const sunGlintColor = new THREE.Color(0xfff3c9);
+  const sunDir = new THREE.Vector3(-0.46, 0.82, 0.30).normalize();
 
   const waves = [
     { a: 1.55, l: 34.0, d: 0.10, s: 1.00, q: 0.72, p: 0.1 },
@@ -287,7 +292,7 @@
     }
     const slope = Math.sqrt(slopeX * slopeX + slopeZ * slopeZ);
     foam += smoothstep(0.42, 0.96, slope) * 0.55 * state.foam;
-    return { x: x + dx, y, z: z + dz, foam: clamp(foam, 0, 1), slope };
+    return { x: x + dx, y, z: z + dz, foam: clamp(foam, 0, 1), slope, slopeX, slopeZ };
   }
 
   let frameIndex = 0;
@@ -299,7 +304,32 @@
       foamAttr[i] = lerp(foamAttr[i], s.foam, 0.08);
       foamSum += foamAttr[i];
       const h = clamp((s.y + 3.0) / 7.5, 0, 1);
-      const c = deep.clone().lerp(mid, h).lerp(crest, smoothstep(0.72, 1.0, h) * 0.36).lerp(foamColor, state.showFoam ? foamAttr[i] * 0.72 : 0);
+      const invNormal = 1.0 / Math.sqrt(s.slopeX * s.slopeX + s.slopeZ * s.slopeZ + 1.0);
+      const nx = -s.slopeX * invNormal;
+      const ny = invNormal;
+      const nz = -s.slopeZ * invNormal;
+      const vx = camera.position.x - s.x;
+      const vy = camera.position.y - s.y;
+      const vz = camera.position.z - s.z;
+      const invView = 1.0 / Math.sqrt(vx * vx + vy * vy + vz * vz + 1.0e-6);
+      const vdx = vx * invView;
+      const vdy = vy * invView;
+      const vdz = vz * invView;
+      const ndotv = clamp(nx * vdx + ny * vdy + nz * vdz, 0, 1);
+      const fresnel = Math.pow(1.0 - ndotv, 3.2);
+      const hx = sunDir.x + vdx;
+      const hy = sunDir.y + vdy;
+      const hz = sunDir.z + vdz;
+      const invHalf = 1.0 / Math.sqrt(hx * hx + hy * hy + hz * hz + 1.0e-6);
+      const ndoth = clamp(nx * hx * invHalf + ny * hy * invHalf + nz * hz * invHalf, 0, 1);
+      const sparkle = Math.pow(ndoth, 84.0) * smoothstep(0.35, 1.0, s.slope) * state.sun * state.glint;
+      const reflection = fresnel * state.sun * state.glint * 0.55;
+      const c = deep.clone()
+        .lerp(mid, h)
+        .lerp(crest, smoothstep(0.72, 1.0, h) * 0.36)
+        .lerp(reflectionColor, clamp(reflection, 0, 0.55))
+        .lerp(sunGlintColor, clamp(sparkle, 0, 0.82))
+        .lerp(foamColor, state.showFoam ? foamAttr[i] * 0.72 : 0);
       colors[i * 3 + 0] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
@@ -394,6 +424,7 @@
   bind('foam', 'foam', 2);
   bind('spray', 'spray', 2);
   bind('sun', 'sun', 2);
+  bind('glint', 'glint', 2);
 
   function setControl(id, value) {
     const input = document.getElementById(id);
@@ -405,10 +436,10 @@
     document.getElementById('pause').textContent = state.paused ? 'Resume' : 'Pause';
   };
   document.getElementById('storm').onclick = () => {
-    setControl('wind', 2.05); setControl('chop', 1.72); setControl('swell', 1.55); setControl('foam', 1.72); setControl('spray', 1.45); setControl('sun', 0.62);
+    setControl('wind', 2.05); setControl('chop', 1.72); setControl('swell', 1.55); setControl('foam', 1.25); setControl('spray', 1.45); setControl('sun', 0.62); setControl('glint', 1.15);
   };
   document.getElementById('calm').onclick = () => {
-    setControl('wind', 0.65); setControl('chop', 0.62); setControl('swell', 0.58); setControl('foam', 0.42); setControl('spray', 0.20); setControl('sun', 0.90);
+    setControl('wind', 0.65); setControl('chop', 0.62); setControl('swell', 0.58); setControl('foam', 0.25); setControl('spray', 0.20); setControl('sun', 0.90); setControl('glint', 0.74);
   };
   document.getElementById('sprayToggle').onclick = () => {
     state.showSpray = !state.showSpray;

@@ -69,6 +69,11 @@ Controls the amount of airborne spray particles.
 Sun
 Controls sunlight and highlight intensity.
 
+Glint
+Controls Fresnel-style edge reflection and sharp sun sparkle on steep wave
+facets. Higher values make the surface look wetter and more reflective, but too
+high can become glittery.
+
 Buttons
 -------
 Pause
