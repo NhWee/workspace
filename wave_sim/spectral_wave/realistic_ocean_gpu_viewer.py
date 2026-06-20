@@ -268,13 +268,26 @@ HTML = r"""<!doctype html>
   sprayGeo.setAttribute('position', new THREE.BufferAttribute(sprayPositions, 3));
   sprayGeo.setAttribute('color', new THREE.BufferAttribute(sprayColors, 3));
   sprayGeo.setAttribute('size', new THREE.BufferAttribute(spraySizes, 1));
+  const sprayCanvas = document.createElement('canvas');
+  sprayCanvas.width = sprayCanvas.height = 64;
+  const sprayContext = sprayCanvas.getContext('2d');
+  const sprayGradient = sprayContext.createRadialGradient(32, 32, 2, 32, 32, 30);
+  sprayGradient.addColorStop(0.0, 'rgba(236, 250, 255, 0.95)');
+  sprayGradient.addColorStop(0.35, 'rgba(210, 238, 248, 0.48)');
+  sprayGradient.addColorStop(1.0, 'rgba(180, 220, 240, 0.0)');
+  sprayContext.fillStyle = sprayGradient;
+  sprayContext.fillRect(0, 0, 64, 64);
+  const sprayTexture = new THREE.CanvasTexture(sprayCanvas);
   const sprayMat = new THREE.PointsMaterial({
-    size: 0.28,
-    vertexColors: true,
+    size: 0.34,
     transparent: true,
-    opacity: 0.78,
     depthWrite: false,
-    blending: THREE.AdditiveBlending
+    blending: THREE.NormalBlending,
+    vertexColors: true,
+    opacity: 0.78,
+    map: sprayTexture,
+    alphaMap: sprayTexture,
+    sizeAttenuation: true
   });
   const sprayPoints = new THREE.Points(sprayGeo, sprayMat);
   scene.add(sprayPoints);

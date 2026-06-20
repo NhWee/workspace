@@ -60,6 +60,10 @@ spray emission to steep breaking regions while the separate foam mask remains
 responsible for the visible, fragmented surface foam. Spray inherits a small
 downwind velocity before moving ballistically under gravity.
 
+The spray uses a soft radial sprite texture rather than hard point primitives.
+It fades at the edge and attenuates with depth, so visible droplets read as
+airborne water instead of pixels.
+
 Controls
 --------
 Wind
