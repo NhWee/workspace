@@ -194,6 +194,7 @@
   const baseX = new Float32Array(pos.count);
   const baseZ = new Float32Array(pos.count);
   const foamAttr = new Float32Array(pos.count);
+  const crestAttr = new Float32Array(pos.count);
   const colors = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
     baseX[i] = pos.getX(i);
@@ -217,6 +218,7 @@
   const mid = new THREE.Color(0x08708f);
   const crest = new THREE.Color(0x6faec0);
   const foamColor = new THREE.Color(0xc8e2e6);
+  const crestFoamColor = new THREE.Color(0xd9eff0);
   const reflectionColor = new THREE.Color(0x5aa8c8);
   const sunGlintColor = new THREE.Color(0xfff3c9);
   const sunDir = new THREE.Vector3(-0.46, 0.82, 0.30).normalize();
@@ -327,7 +329,7 @@
     // Retain dense breaking crests, while eroding lower-density foam into
     // short-lived, advecting patches instead of a uniform white blanket.
     foam = clamp(foam * (0.26 + 0.94 * breakup) + foamCore * 0.24, 0, 1);
-    return { x: x + dx, y, z: z + dz, foam, breaking: crestBreak, slope, slopeX, slopeZ };
+    return { x: x + dx, y, z: z + dz, foam, breaking: crestBreak, breakup, slope, slopeX, slopeZ };
   }
 
   let frameIndex = 0;
@@ -337,6 +339,7 @@
       const s = sampleOcean(baseX[i], baseZ[i], t);
       pos.setXYZ(i, s.x, s.y, s.z);
       foamAttr[i] = lerp(foamAttr[i], s.foam, 0.08);
+      crestAttr[i] = lerp(crestAttr[i], s.breaking, 0.14);
       foamSum += foamAttr[i];
       const h = clamp((s.y + 3.0) / 7.5, 0, 1);
       const invNormal = 1.0 / Math.sqrt(s.slopeX * s.slopeX + s.slopeZ * s.slopeZ + 1.0);
@@ -359,12 +362,15 @@
       const ndoth = clamp(nx * hx * invHalf + ny * hy * invHalf + nz * hz * invHalf, 0, 1);
       const sparkle = Math.pow(ndoth, 84.0) * smoothstep(0.35, 1.0, s.slope) * state.sun * state.glint;
       const reflection = fresnel * state.sun * state.glint * 0.42;
+      const crestRibbon = smoothstep(0.62, 0.90, crestAttr[i]) * (0.32 + 0.68 * s.breakup);
+      const foamBlend = state.showFoam ? clamp(foamAttr[i] * 0.48, 0, 0.50) : 0;
       const c = deep.clone()
         .lerp(mid, h)
         .lerp(crest, smoothstep(0.72, 1.0, h) * 0.25)
         .lerp(reflectionColor, clamp(reflection, 0, 0.42))
         .lerp(sunGlintColor, clamp(sparkle, 0, 0.68))
-        .lerp(foamColor, state.showFoam ? foamAttr[i] * 0.48 : 0);
+        .lerp(foamColor, foamBlend)
+        .lerp(crestFoamColor, state.showFoam ? crestRibbon * 0.18 : 0);
       colors[i * 3 + 0] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;

@@ -60,6 +60,10 @@ spray emission to steep breaking regions while the separate foam mask remains
 responsible for the visible, fragmented surface foam. Spray inherits a small
 downwind velocity before moving ballistically under gravity.
 
+The strongest crest-breaking values are also rendered as a narrow cool-white
+ribbon. It is modulated by the same drifting breakup pattern, so it highlights
+the active edge of a wave without filling the whole surface with foam.
+
 The spray uses a soft radial sprite texture rather than hard point primitives.
 It fades at the edge and attenuates with depth, so visible droplets read as
 airborne water instead of pixels.
