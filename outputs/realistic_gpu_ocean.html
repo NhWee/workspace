@@ -253,7 +253,7 @@
   sprayGeo.setAttribute('color', new THREE.BufferAttribute(sprayColors, 3));
   sprayGeo.setAttribute('size', new THREE.BufferAttribute(spraySizes, 1));
   const sprayMat = new THREE.PointsMaterial({
-    size: 0.20,
+    size: 0.28,
     vertexColors: true,
     transparent: true,
     opacity: 0.78,
@@ -275,7 +275,7 @@
   }
 
   function sampleOcean(x, z, t) {
-    let y = 0, dx = 0, dz = 0, foam = 0, slopeX = 0, slopeZ = 0;
+    let y = 0, dx = 0, dz = 0, foam = 0, breaking = 0, slopeX = 0, slopeZ = 0;
     for (const w of waves) {
       const windScale = state.wind;
       const amp = w.a * state.swell * (0.72 + 0.28 * windScale);
@@ -289,7 +289,9 @@
       dz += q * amp * w.dir.y * cs;
       slopeX += amp * w.k * w.dir.x * cs;
       slopeZ += amp * w.k * w.dir.y * cs;
-      foam += smoothstep(0.70, 0.98, sn) * w.q * amp * w.k * state.foam;
+      const crestSample = smoothstep(0.70, 0.98, sn);
+      foam += crestSample * w.q * amp * w.k * state.foam;
+      breaking += crestSample * w.q * amp * w.k * 4.4;
     }
     for (const c of wakeCenters) {
       const cx = c.x + Math.sin(t * c.speed + c.phase) * 11.0;
@@ -305,13 +307,14 @@
     }
     const slope = Math.sqrt(slopeX * slopeX + slopeZ * slopeZ);
     foam += smoothstep(0.42, 0.96, slope) * 0.55 * state.foam;
+    const crestBreak = clamp(breaking * state.foam, 0, 1);
     foam = clamp(foam, 0, 1);
     const breakup = foamBreakup(x + dx, z + dz, t);
     const foamCore = smoothstep(0.72, 0.96, foam);
     // Retain dense breaking crests, while eroding lower-density foam into
     // short-lived, advecting patches instead of a uniform white blanket.
     foam = clamp(foam * (0.26 + 0.94 * breakup) + foamCore * 0.24, 0, 1);
-    return { x: x + dx, y, z: z + dz, foam, slope, slopeX, slopeZ };
+    return { x: x + dx, y, z: z + dz, foam, breaking: crestBreak, slope, slopeX, slopeZ };
   }
 
   let frameIndex = 0;
@@ -358,19 +361,19 @@
     geo.computeVertexNormals();
 
     if (state.showSpray && state.spray > 0 && frameIndex % 2 === 0) {
-      for (let k = 0; k < 10 * state.spray; k++) {
+      for (let k = 0; k < 18 * state.spray; k++) {
         const x = (Math.random() - 0.5) * size * 0.82;
         const z = (Math.random() - 0.5) * size * 0.82;
         const s = sampleOcean(x, z, t);
-        if (s.foam > 0.70 && spray.length < maxSpray && Math.random() < s.foam * 0.20) {
+        if (s.breaking > 0.30 && spray.length < maxSpray && Math.random() < s.breaking * 0.30 * state.spray) {
           spray.push({
             x: s.x, y: s.y + 0.35, z: s.z,
-            vx: (Math.random() - 0.5) * 0.25,
-            vy: 1.0 + Math.random() * 2.4 * state.spray,
-            vz: (Math.random() - 0.5) * 0.25,
+            vx: 0.22 * state.wind + (Math.random() - 0.5) * 0.56,
+            vy: 0.95 + Math.random() * 2.15 * state.spray + s.breaking * 1.05,
+            vz: 0.04 * state.wind + (Math.random() - 0.5) * 0.46,
             age: 0,
-            life: 0.45 + Math.random() * 0.65,
-            size: 0.12 + Math.random() * 0.24
+            life: 0.34 + Math.random() * 0.52,
+            size: 0.10 + Math.random() * 0.20
           });
         }
       }

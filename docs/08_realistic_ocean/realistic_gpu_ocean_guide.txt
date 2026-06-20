@@ -55,8 +55,10 @@ breaking crests stay coherent, while their lower-density edges fragment and
 fade into moving patches. This avoids a uniform white layer and prevents
 frame-to-frame random flicker.
 
-Spray particles are emitted from high-foam breaking regions and then move
-ballistically under gravity.
+Each wave component also contributes a crest-breaking measure. It restricts
+spray emission to steep breaking regions while the separate foam mask remains
+responsible for the visible, fragmented surface foam. Spray inherits a small
+downwind velocity before moving ballistically under gravity.
 
 Controls
 --------
