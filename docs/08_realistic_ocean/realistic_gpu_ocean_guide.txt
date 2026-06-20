@@ -111,6 +111,12 @@ Sets wind, swell, foam, and spray higher while keeping Gerstner steepness below
 the self-intersection range. It should look energetic without producing folded,
 pillar-like wave geometry.
 
+At storm strength, crossing-direction components receive extra energy so the
+surface is not made of parallel wave rows. The primary vortex is deliberately
+kept near the view center and combines a depressed core, spiral ripples,
+tangential displacement, foam, and crest energy. Storm spray also uses more
+emitters, larger particles, and a stronger initial upward velocity.
+
 Calm preset
 Sets lower-energy ocean parameters.
 

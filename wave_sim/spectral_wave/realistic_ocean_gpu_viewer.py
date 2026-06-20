@@ -258,8 +258,8 @@ HTML = r"""<!doctype html>
   });
 
   const wakeCenters = [
-    { x: -18, z: -7, spin: 1.0, r: 17, speed: 0.38, phase: 0.2 },
-    { x: 18, z: 10, spin: -1.0, r: 15, speed: 0.31, phase: 2.1 }
+    { x: -5, z: -4, spin: 1.0, r: 15, speed: 0.42, phase: 0.2, strength: 1.0 },
+    { x: 19, z: 12, spin: -1.0, r: 13, speed: 0.31, phase: 2.1, strength: 0.52 }
   ];
 
   const sprayGeo = new THREE.BufferGeometry();
@@ -309,7 +309,8 @@ HTML = r"""<!doctype html>
     let y = 0, dx = 0, dz = 0, foam = 0, breaking = 0, slopeX = 0, slopeZ = 0;
     for (const w of waves) {
       const windScale = state.wind;
-      const amp = w.a * state.swell * (0.72 + 0.28 * windScale);
+      const directionalSpread = 1.0 + (1.0 - Math.cos(w.d - 0.10)) * 0.16 * smoothstep(1.05, 2.5, windScale);
+      const amp = w.a * state.swell * (0.72 + 0.28 * windScale) * directionalSpread;
       const angularFrequency = Math.sqrt(9.81 * w.k) * 0.68 * w.s * (0.72 + 0.28 * windScale);
       const phase = w.k * (w.dir.x * x + w.dir.y * z) - t * angularFrequency + w.p;
       const sn = Math.sin(phase);
@@ -329,12 +330,22 @@ HTML = r"""<!doctype html>
       const cz = c.z + Math.cos(t * c.speed * 0.8 + c.phase) * 9.0;
       const rx = x - cx, rz = z - cz;
       const r2 = rx * rx + rz * rz;
-      const g = Math.exp(-r2 / (c.r * c.r));
-      const angle = Math.atan2(rz, rx) + c.spin * t * 1.4;
-      y += Math.sin(angle * 2.0 + t * 1.7) * g * 0.45 * state.chop;
-      foam += g * 0.55 * state.foam;
-      dx += -rz / c.r * g * c.spin * 0.9;
-      dz += rx / c.r * g * c.spin * 0.9;
+      const r = Math.sqrt(r2) + 1.0e-4;
+      const radial = r / c.r;
+      const envelope = Math.exp(-radial * radial * 1.45);
+      const core = Math.exp(-radial * radial * 5.4);
+      const angle = Math.atan2(rz, rx);
+      const power = c.strength * (0.32 + 0.34 * state.wind);
+      const spiralPhase = radial * 11.5 - c.spin * angle * 3.6 - t * (1.3 + state.wind * 0.48);
+      const spiral = Math.sin(spiralPhase);
+      const radialSlope = Math.cos(spiralPhase) * 11.5 / c.r * envelope * power;
+      y += (spiral * envelope * 0.82 - core * 0.46) * power;
+      slopeX += radialSlope * rx / r;
+      slopeZ += radialSlope * rz / r;
+      foam += (smoothstep(0.48, 0.96, 0.5 + 0.5 * spiral) * envelope * 0.48 + core * 0.28) * state.foam * power;
+      breaking += smoothstep(0.74, 0.98, 0.5 + 0.5 * spiral) * envelope * 0.32 * power;
+      dx += -rz / c.r * envelope * c.spin * 1.38 * power;
+      dz += rx / c.r * envelope * c.spin * 1.38 * power;
     }
     const slope = Math.sqrt(slopeX * slopeX + slopeZ * slopeZ);
     foam += smoothstep(0.42, 0.96, slope) * 0.55 * state.foam;
@@ -396,19 +407,19 @@ HTML = r"""<!doctype html>
     geo.computeVertexNormals();
 
     if (state.showSpray && state.spray > 0 && frameIndex % 2 === 0) {
-      for (let k = 0; k < 18 * state.spray; k++) {
+      for (let k = 0; k < 42 * state.spray; k++) {
         const x = (Math.random() - 0.5) * size * 0.82;
         const z = (Math.random() - 0.5) * size * 0.82;
         const s = sampleOcean(x, z, t);
-        if (s.breaking > 0.30 && spray.length < maxSpray && Math.random() < s.breaking * 0.30 * state.spray) {
+        if (s.breaking > 0.28 && spray.length < maxSpray && Math.random() < s.breaking * 0.34 * state.spray) {
           spray.push({
             x: s.x, y: s.y + 0.35, z: s.z,
             vx: 0.22 * state.wind + (Math.random() - 0.5) * 0.56,
-            vy: 0.95 + Math.random() * 2.15 * state.spray + s.breaking * 1.05,
+            vy: 1.05 + Math.random() * 2.55 * state.spray + s.breaking * 1.25,
             vz: 0.04 * state.wind + (Math.random() - 0.5) * 0.46,
             age: 0,
-            life: 0.34 + Math.random() * 0.52,
-            size: 0.10 + Math.random() * 0.20
+            life: 0.38 + Math.random() * 0.60,
+            size: 0.12 + Math.random() * 0.28
           });
         }
       }
@@ -494,7 +505,7 @@ HTML = r"""<!doctype html>
   };
   document.getElementById('storm').onclick = () => {
     // Keep the summed Gerstner steepness below the self-intersection range.
-    setControl('wind', 1.85); setControl('chop', 1.16); setControl('swell', 1.30); setControl('foam', 1.05); setControl('spray', 1.30); setControl('sun', 0.62); setControl('glint', 1.08);
+    setControl('wind', 2.05); setControl('chop', 1.22); setControl('swell', 1.35); setControl('foam', 0.92); setControl('spray', 1.85); setControl('sun', 0.55); setControl('glint', 1.00);
   };
   document.getElementById('calm').onclick = () => {
     setControl('wind', 0.65); setControl('chop', 0.62); setControl('swell', 0.58); setControl('foam', 0.25); setControl('spray', 0.20); setControl('sun', 0.90); setControl('glint', 0.74);
@@ -526,6 +537,7 @@ HTML = r"""<!doctype html>
       sunDisk.lookAt(camera.position);
     }
     waterMat.roughness = 0.54 - 0.16 * state.sun;
+    sprayMat.size = 0.24 + 0.11 * state.spray;
     renderer.render(scene, camera);
     readout.textContent = `fps=${state.fps.toFixed(0)}  vertices=${pos.count}  foam=${foamAverage.toFixed(3)}  spray=${state.sprayCount}`;
     requestAnimationFrame(animate);
