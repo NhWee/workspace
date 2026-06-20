@@ -46,3 +46,13 @@ Production run:
 The solver writes an NPZ particle cache and matching JSON metadata to outputs/.
 Only a bounded random subset of particles is exported per frame; every particle
 still participates in the simulation itself.
+
+Viewer
+------
+After a solver run, create a rotatable and zoomable 3D viewer:
+
+  .\.venv\Scripts\python.exe -m wave_sim.three_d_fluid.render_apic_particle_cache
+
+The viewer draws a smaller coherent subset from the cache, colored by particle
+speed. The simulation cache preserves the same particle indices in every saved
+frame, so the motion does not flicker from frame to frame.

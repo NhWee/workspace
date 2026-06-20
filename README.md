@@ -44,6 +44,7 @@ Python 코드는 `wave_sim/` 패키지 안에 section별로 정리되어 있습�
 .\.venv\Scripts\python.exe -m wave_sim.workflow_tools.plan_spectral_choppy_production_export --recommendation-json outputs\spectral_choppy_asset_bundle_sweep\bundle_recommendation.json
 .\.venv\Scripts\python.exe -m wave_sim.workflow_tools.validate_wave_workflow
 .\.venv\Scripts\python.exe -m wave_sim.three_d_fluid.apic_wave_tank_3d --quality preview
+.\.venv\Scripts\python.exe -m wave_sim.three_d_fluid.render_apic_particle_cache
 ```
 
 ## Shallow Water Quick Runs

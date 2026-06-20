@@ -210,11 +210,15 @@ class APICWaveTank:
         self.grid_operations(sim_time)
         self.g2p()
 
-    def export_particles(self, max_particles: int, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
+    def make_export_indices(self, max_particles: int, rng: np.random.Generator) -> np.ndarray | None:
+        if self.n_particles <= max_particles:
+            return None
+        return rng.choice(self.n_particles, size=max_particles, replace=False)
+
+    def export_particles(self, indices: np.ndarray | None) -> tuple[np.ndarray, np.ndarray]:
         positions = self.x.to_numpy()
         velocities = self.v.to_numpy()
-        if positions.shape[0] > max_particles:
-            indices = rng.choice(positions.shape[0], size=max_particles, replace=False)
+        if indices is not None:
             positions = positions[indices]
             velocities = velocities[indices]
         return positions.astype(np.float32), velocities.astype(np.float32)
@@ -228,6 +232,7 @@ def run_simulation(config: SimulationConfig, seed: int, output: Path) -> None:
     velocities: list[np.ndarray] = []
     sim_time = 0.0
     start = time.perf_counter()
+    export_indices = simulator.make_export_indices(config.max_export_particles, rng)
 
     print(
         f"CUDA APIC-MPM: grid={config.n_grid}^3, particles={simulator.n_particles:,}, "
@@ -238,7 +243,7 @@ def run_simulation(config: SimulationConfig, seed: int, output: Path) -> None:
             simulator.substep(sim_time)
             sim_time += config.dt
         if frame % config.export_every == 0 or frame == config.frames - 1:
-            positions, velocity = simulator.export_particles(config.max_export_particles, rng)
+            positions, velocity = simulator.export_particles(export_indices)
             frames.append(positions)
             velocities.append(velocity)
         if (frame + 1) % max(1, config.frames // 12) == 0 or frame == config.frames - 1:
@@ -263,8 +268,8 @@ def run_simulation(config: SimulationConfig, seed: int, output: Path) -> None:
     }
     np.savez_compressed(
         output,
-        positions=np.asarray(frames, dtype=object),
-        velocities=np.asarray(velocities, dtype=object),
+        positions=np.stack(frames),
+        velocities=np.stack(velocities),
         metadata=json.dumps(metadata),
     )
     output.with_suffix(".json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
