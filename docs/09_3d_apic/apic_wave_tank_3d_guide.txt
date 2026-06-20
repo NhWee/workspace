@@ -1,0 +1,48 @@
+3D CUDA APIC-MPM wave tank
+===========================
+
+Purpose
+-------
+This is the offline high-computation path for the realistic-wave goal. Unlike
+the browser ocean surface, it stores a three-dimensional fluid volume as
+particles and transfers their mass and momentum to a 3D voxel grid every
+substep.
+
+Model
+-----
+The solver uses APIC-MPM (Affine Particle-In-Cell Material Point Method):
+
+1. particles transfer mass and affine momentum to a 3D grid
+2. a weakly-compressible equation of state applies pressure
+3. gravity and a periodic paddle-like driver update grid velocity
+4. boundary conditions enforce a closed wave tank
+5. updated grid velocity transfers back to particles
+
+The result has a true 3D free surface, bulk circulation, detached droplets,
+and splash-like motion. It is not a two-phase air-water Navier-Stokes solver,
+so it does not yet resolve individual air bubbles or exact overturning-wave
+impact physics.
+
+Quality modes
+-------------
+preview
+48^3 grid, approximately 50,000 fluid particles. Use it to check stability.
+
+production
+128^3 grid, approximately 1.5 million fluid particles, 240 output frames and
+28 physics substeps per frame. This is intentionally expensive and is the
+default because the goal is physical detail rather than interactive speed.
+
+Run
+---
+Quick stability check:
+
+  .\.venv\Scripts\python.exe -m wave_sim.three_d_fluid.apic_wave_tank_3d --quality preview
+
+Production run:
+
+  .\.venv\Scripts\python.exe -m wave_sim.three_d_fluid.apic_wave_tank_3d --quality production
+
+The solver writes an NPZ particle cache and matching JSON metadata to outputs/.
+Only a bounded random subset of particles is exported per frame; every particle
+still participates in the simulation itself.

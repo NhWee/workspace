@@ -14,3 +14,4 @@ tqdm==4.67.3
 jupyterlab==4.5.7
 ipykernel==7.2.0
 ipywidgets==8.1.8
+taichi==1.7.4

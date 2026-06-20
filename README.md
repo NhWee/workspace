@@ -15,6 +15,7 @@ wave_sim/
   workflow_tools/    report, comparison, sweep, recommendation, validation
   benchmarks/        solver 성능 측정과 비교
   data/              dataset 저장, 로드, 비교
+  three_d_fluid/     CUDA APIC-MPM 기반 오프라인 3D 자유수면 유체
 
 docs/
   00_setup/
@@ -42,6 +43,7 @@ Python 코드는 `wave_sim/` 패키지 안에 section별로 정리되어 있습�
 .\.venv\Scripts\python.exe -m wave_sim.workflow_tools.recommend_spectral_choppy_asset_bundle --sweep-manifest outputs\spectral_choppy_asset_bundle_sweep\sweep_manifest.json
 .\.venv\Scripts\python.exe -m wave_sim.workflow_tools.plan_spectral_choppy_production_export --recommendation-json outputs\spectral_choppy_asset_bundle_sweep\bundle_recommendation.json
 .\.venv\Scripts\python.exe -m wave_sim.workflow_tools.validate_wave_workflow
+.\.venv\Scripts\python.exe -m wave_sim.three_d_fluid.apic_wave_tank_3d --quality preview
 ```
 
 ## Shallow Water Quick Runs
