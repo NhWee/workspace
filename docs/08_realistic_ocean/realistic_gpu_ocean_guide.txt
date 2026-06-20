@@ -44,6 +44,11 @@ Foam is generated from:
 2. steep slopes
 3. moving vortex/wake centers
 
+The foam mask is then broken into a drifting, multi-scale pattern. Dense
+breaking crests stay coherent, while their lower-density edges fragment and
+fade into moving patches. This avoids a uniform white layer and prevents
+frame-to-frame random flicker.
+
 Spray particles are emitted from high-foam breaking regions and then move
 ballistically under gravity.
 
@@ -80,7 +85,9 @@ Pause
 Stops or resumes the viewer.
 
 Storm preset
-Sets wind, choppiness, swell, foam, and spray higher.
+Sets wind, swell, foam, and spray higher while keeping Gerstner steepness below
+the self-intersection range. It should look energetic without producing folded,
+pillar-like wave geometry.
 
 Calm preset
 Sets lower-energy ocean parameters.

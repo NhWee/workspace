@@ -278,6 +278,16 @@ HTML = r"""<!doctype html>
   scene.add(sprayPoints);
   const spray = [];
 
+  function foamBreakup(x, z, t) {
+    // A cheap, drifting multi-frequency pattern. It breaks the foam edge into
+    // patches without adding a per-frame texture allocation or random flicker.
+    const flow = t * (0.72 + state.wind * 0.34);
+    const broad = Math.sin(x * 0.46 + z * 0.19 - flow);
+    const cross = Math.sin(-x * 0.27 + z * 0.63 + flow * 0.71 + 1.8);
+    const fine = Math.sin(x * 1.18 + z * 0.81 - flow * 1.43 + 0.5);
+    return clamp(0.50 + broad * 0.24 + cross * 0.17 + fine * 0.09, 0, 1);
+  }
+
   function sampleOcean(x, z, t) {
     let y = 0, dx = 0, dz = 0, foam = 0, slopeX = 0, slopeZ = 0;
     for (const w of waves) {
@@ -308,7 +318,13 @@ HTML = r"""<!doctype html>
     }
     const slope = Math.sqrt(slopeX * slopeX + slopeZ * slopeZ);
     foam += smoothstep(0.42, 0.96, slope) * 0.55 * state.foam;
-    return { x: x + dx, y, z: z + dz, foam: clamp(foam, 0, 1), slope, slopeX, slopeZ };
+    foam = clamp(foam, 0, 1);
+    const breakup = foamBreakup(x + dx, z + dz, t);
+    const foamCore = smoothstep(0.72, 0.96, foam);
+    // Retain dense breaking crests, while eroding lower-density foam into
+    // short-lived, advecting patches instead of a uniform white blanket.
+    foam = clamp(foam * (0.26 + 0.94 * breakup) + foamCore * 0.24, 0, 1);
+    return { x: x + dx, y, z: z + dz, foam, slope, slopeX, slopeZ };
   }
 
   let frameIndex = 0;
@@ -345,7 +361,7 @@ HTML = r"""<!doctype html>
         .lerp(crest, smoothstep(0.72, 1.0, h) * 0.36)
         .lerp(reflectionColor, clamp(reflection, 0, 0.55))
         .lerp(sunGlintColor, clamp(sparkle, 0, 0.82))
-        .lerp(foamColor, state.showFoam ? foamAttr[i] * 0.72 : 0);
+        .lerp(foamColor, state.showFoam ? foamAttr[i] * 0.64 : 0);
       colors[i * 3 + 0] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
@@ -452,7 +468,8 @@ HTML = r"""<!doctype html>
     document.getElementById('pause').textContent = state.paused ? 'Resume' : 'Pause';
   };
   document.getElementById('storm').onclick = () => {
-    setControl('wind', 2.05); setControl('chop', 1.72); setControl('swell', 1.55); setControl('foam', 1.25); setControl('spray', 1.45); setControl('sun', 0.62); setControl('glint', 1.15);
+    // Keep the summed Gerstner steepness below the self-intersection range.
+    setControl('wind', 1.85); setControl('chop', 1.16); setControl('swell', 1.30); setControl('foam', 1.05); setControl('spray', 1.30); setControl('sun', 0.62); setControl('glint', 1.08);
   };
   document.getElementById('calm').onclick = () => {
     setControl('wind', 0.65); setControl('chop', 0.62); setControl('swell', 0.58); setControl('foam', 0.25); setControl('spray', 0.20); setControl('sun', 0.90); setControl('glint', 0.74);
