@@ -38,6 +38,12 @@ The wave field is made from multiple Gerstner-like components:
 height += amplitude * sin(k * dot(direction, position) - omega * t + phase)
 horizontal displacement += steepness * amplitude * direction * cos(phase)
 
+The components form a directional spectrum: a dominant swell is mixed with
+weaker crossing waves and short wind ripples. Their wavelengths, directions,
+and phases are intentionally varied so the surface does not repeat as evenly
+spaced wave rows. Each component uses deep-water dispersion
+(angular_frequency proportional to sqrt(gravity * wave_number)).
+
 Foam is generated from:
 
 1. sharp crests

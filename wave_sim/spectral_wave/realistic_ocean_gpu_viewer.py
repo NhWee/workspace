@@ -240,14 +240,18 @@ HTML = r"""<!doctype html>
   const sunDir = new THREE.Vector3(-0.46, 0.82, 0.30).normalize();
 
   const waves = [
-    { a: 1.55, l: 34.0, d: 0.10, s: 1.00, q: 0.72, p: 0.1 },
-    { a: 1.10, l: 22.0, d: 0.18, s: 1.25, q: 0.65, p: 1.3 },
-    { a: 0.82, l: 16.0, d: -0.05, s: 1.55, q: 0.60, p: 2.1 },
-    { a: 0.58, l: 11.0, d: 0.36, s: 1.90, q: 0.54, p: 0.8 },
-    { a: 0.42, l: 8.0, d: -0.32, s: 2.25, q: 0.44, p: 2.9 },
-    { a: 0.30, l: 5.8, d: 0.72, s: 2.70, q: 0.34, p: 1.7 },
-    { a: 0.24, l: 4.4, d: -0.85, s: 3.10, q: 0.28, p: 2.4 },
-    { a: 0.18, l: 3.3, d: 1.35, s: 3.65, q: 0.20, p: 0.4 }
+    // A directional spectrum: dominant swell plus weaker crossing components.
+    // Varied wavelengths and phases avoid a repeating row-of-hills appearance.
+    { a: 1.42, l: 38.0, d: 0.10, s: 0.94, q: 0.54, p: 0.12 },
+    { a: 1.00, l: 27.0, d: 0.21, s: 1.03, q: 0.50, p: 1.42 },
+    { a: 0.72, l: 19.0, d: -0.09, s: 1.11, q: 0.46, p: 2.36 },
+    { a: 0.52, l: 15.0, d: 0.46, s: 1.16, q: 0.40, p: 0.76 },
+    { a: 0.40, l: 11.5, d: -0.38, s: 1.23, q: 0.35, p: 2.84 },
+    { a: 0.31, l: 8.4, d: 0.78, s: 1.30, q: 0.28, p: 1.67 },
+    { a: 0.25, l: 6.4, d: -0.72, s: 1.38, q: 0.23, p: 3.02 },
+    { a: 0.20, l: 5.1, d: 1.16, s: 1.46, q: 0.19, p: 0.39 },
+    { a: 0.16, l: 4.0, d: -1.19, s: 1.55, q: 0.15, p: 2.12 },
+    { a: 0.12, l: 3.2, d: 1.62, s: 1.67, q: 0.12, p: 1.05 }
   ].map(w => {
     const dir = new THREE.Vector2(Math.cos(w.d), Math.sin(w.d)).normalize();
     return { ...w, dir, k: Math.PI * 2 / w.l };
@@ -293,7 +297,8 @@ HTML = r"""<!doctype html>
     for (const w of waves) {
       const windScale = state.wind;
       const amp = w.a * state.swell * (0.72 + 0.28 * windScale);
-      const phase = w.k * (w.dir.x * x + w.dir.y * z) - t * w.s * Math.sqrt(w.k) * 2.15 * windScale + w.p;
+      const angularFrequency = Math.sqrt(9.81 * w.k) * 0.68 * w.s * (0.72 + 0.28 * windScale);
+      const phase = w.k * (w.dir.x * x + w.dir.y * z) - t * angularFrequency + w.p;
       const sn = Math.sin(phase);
       const cs = Math.cos(phase);
       y += amp * sn;
