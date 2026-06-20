@@ -203,13 +203,11 @@
 
   const waterMat = new THREE.MeshPhysicalMaterial({
     vertexColors: true,
-    roughness: 0.34,
+    roughness: 0.44,
     metalness: 0.0,
     transmission: 0.0,
-    transparent: true,
-    opacity: 0.96,
-    clearcoat: 0.75,
-    clearcoatRoughness: 0.18,
+    clearcoat: 0.42,
+    clearcoatRoughness: 0.30,
     side: THREE.DoubleSide
   });
   const water = new THREE.Mesh(geo, waterMat);
@@ -217,9 +215,9 @@
 
   const deep = new THREE.Color(0x05243a);
   const mid = new THREE.Color(0x08708f);
-  const crest = new THREE.Color(0xaee8f5);
-  const foamColor = new THREE.Color(0xffffff);
-  const reflectionColor = new THREE.Color(0x7ecfff);
+  const crest = new THREE.Color(0x6faec0);
+  const foamColor = new THREE.Color(0xc8e2e6);
+  const reflectionColor = new THREE.Color(0x5aa8c8);
   const sunGlintColor = new THREE.Color(0xfff3c9);
   const sunDir = new THREE.Vector3(-0.46, 0.82, 0.30).normalize();
 
@@ -344,13 +342,13 @@
       const invHalf = 1.0 / Math.sqrt(hx * hx + hy * hy + hz * hz + 1.0e-6);
       const ndoth = clamp(nx * hx * invHalf + ny * hy * invHalf + nz * hz * invHalf, 0, 1);
       const sparkle = Math.pow(ndoth, 84.0) * smoothstep(0.35, 1.0, s.slope) * state.sun * state.glint;
-      const reflection = fresnel * state.sun * state.glint * 0.55;
+      const reflection = fresnel * state.sun * state.glint * 0.42;
       const c = deep.clone()
         .lerp(mid, h)
-        .lerp(crest, smoothstep(0.72, 1.0, h) * 0.36)
-        .lerp(reflectionColor, clamp(reflection, 0, 0.55))
-        .lerp(sunGlintColor, clamp(sparkle, 0, 0.82))
-        .lerp(foamColor, state.showFoam ? foamAttr[i] * 0.64 : 0);
+        .lerp(crest, smoothstep(0.72, 1.0, h) * 0.25)
+        .lerp(reflectionColor, clamp(reflection, 0, 0.42))
+        .lerp(sunGlintColor, clamp(sparkle, 0, 0.68))
+        .lerp(foamColor, state.showFoam ? foamAttr[i] * 0.48 : 0);
       colors[i * 3 + 0] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
@@ -489,7 +487,7 @@
       camera.lookAt(0, 0.3, 0);
       sunDisk.lookAt(camera.position);
     }
-    waterMat.roughness = 0.40 - 0.18 * state.sun;
+    waterMat.roughness = 0.54 - 0.16 * state.sun;
     renderer.render(scene, camera);
     readout.textContent = `fps=${state.fps.toFixed(0)}  vertices=${pos.count}  foam=${foamAverage.toFixed(3)}  spray=${state.sprayCount}`;
     requestAnimationFrame(animate);

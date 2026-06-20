@@ -85,6 +85,12 @@ Controls Fresnel-style edge reflection and sharp sun sparkle on steep wave
 facets. Higher values make the surface look wetter and more reflective, but too
 high can become glittery.
 
+Material tuning
+---------------
+The water uses a moderately rough physical material and blue-tinted reflection.
+Foam and high crests are cool blue-white rather than pure white, so the surface
+keeps visible depth instead of reading as a uniformly bright solid.
+
 Buttons
 -------
 Pause
