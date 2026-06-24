@@ -5,3 +5,7 @@ __pycache__/
 
 # Keep generated simulation outputs out of normal commits unless explicitly requested.
 outputs/
+
+# Local portable Blender runtime used for offline Mantaflow bakes.
+tools/blender-5.1.2/
+tools/blender-5.1.2-windows-x64.zip
