@@ -1,0 +1,39 @@
+Blender Mantaflow FLIP wave tank
+================================
+
+Purpose
+-------
+This is the main high-realism path for the project. It replaces the browser
+surface approximation with Blender's Mantaflow liquid solver, which uses a
+FLIP-style liquid domain and can bake liquid mesh plus foam, bubble, and spray
+secondary particles.
+
+Scene
+-----
+The generated scene contains:
+
+1. a 12 x 5 x 5 liquid domain
+2. an initial liquid volume
+3. an animated paddle that injects wave energy
+4. a collision rock that creates breaking flow and splash
+5. liquid mesh and foam/bubble/spray settings
+
+Quality
+-------
+preview: resolution 96 for iteration.
+production: resolution 256, higher mesh scale, and more time substeps. This is
+an offline bake and may take a long time depending on cache frames and GPU.
+
+Create a preview scene
+----------------------
+From the project root:
+
+  .\tools\blender-5.1.2\blender-5.1.2-windows-x64\blender.exe --background --python wave_sim\blender_fluid\create_mantaflow_wave_tank.py -- --quality preview
+
+Create and bake the production scene
+------------------------------------
+
+  .\tools\blender-5.1.2\blender-5.1.2-windows-x64\blender.exe --background --python wave_sim\blender_fluid\create_mantaflow_wave_tank.py -- --quality production --bake
+
+The blend scene is written to outputs/mantaflow_wave_tank.blend and its cache
+is written to outputs/mantaflow_wave_tank_cache/.
