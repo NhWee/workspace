@@ -18,8 +18,9 @@ import bpy
 
 
 PRESETS = {
-    "preview": {"resolution": 112, "frame_end": 120, "timesteps_max": 6, "mesh_scale": 3},
-    "production": {"resolution": 256, "frame_end": 220, "timesteps_max": 8, "mesh_scale": 4},
+    "preview": {"resolution": 112, "frame_end": 120, "timesteps_max": 6, "mesh_scale": 3, "fps": 24},
+    "long_preview": {"resolution": 96, "frame_end": 360, "timesteps_max": 5, "mesh_scale": 3, "fps": 48},
+    "production": {"resolution": 256, "frame_end": 220, "timesteps_max": 8, "mesh_scale": 4, "fps": 24},
 }
 
 
@@ -28,6 +29,8 @@ def script_args() -> argparse.Namespace:
     parser.add_argument("--quality", choices=sorted(PRESETS), default="production")
     parser.add_argument("--output", type=Path, default=Path("outputs/mantaflow_wave_tank.blend"))
     parser.add_argument("--cache-dir", type=Path, default=Path("outputs/mantaflow_wave_tank_cache"))
+    parser.add_argument("--frame-end", type=int, default=None, help="Override the preset timeline length.")
+    parser.add_argument("--fps", type=int, default=None, help="Override the scene playback frame rate.")
     parser.add_argument("--bake", action="store_true", help="Bake data, mesh, and secondary particles after scene creation.")
     return parser.parse_args(sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else [])
 
@@ -136,10 +139,18 @@ def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
     return domain
 
 
-def animate_paddle(paddle: bpy.types.Object) -> None:
-    # The paddle begins in air, then only grazes the leading water edge. Starting
-    # it inside the initial liquid produces an artificial explosive jet.
-    keyframes = ((1, -4.55), (20, -4.55), (52, -3.55), (76, -4.52), (108, -3.55), (120, -4.52))
+def animate_paddle(paddle: bpy.types.Object, frame_end: int) -> None:
+    # The paddle begins in air, then periodically grazes the leading water edge.
+    # Keeping the forcing active makes long bakes continue like a driven wave
+    # tank instead of calming down after the first impact.
+    keyframes = [(1, -4.55), (20, -4.55)]
+    cycle_start = 52
+    cycle = 56
+    frame = cycle_start
+    while frame <= frame_end + cycle:
+        keyframes.append((frame, -3.55))
+        keyframes.append((frame + 24, -4.52))
+        frame += cycle
     for frame, x in keyframes:
         paddle.location.x = x
         paddle.keyframe_insert(data_path="location", index=0, frame=frame)
@@ -160,11 +171,17 @@ def setup_camera_and_lights() -> None:
 
 
 def create_scene(args: argparse.Namespace) -> bpy.types.Object:
-    preset = PRESETS[args.quality]
+    preset = dict(PRESETS[args.quality])
+    if args.frame_end is not None:
+        preset["frame_end"] = args.frame_end
+    if args.fps is not None:
+        preset["fps"] = args.fps
     clear_scene()
     scene = bpy.context.scene
     scene.frame_start = 1
     scene.frame_end = preset["frame_end"]
+    scene.render.fps = preset["fps"]
+    scene.sync_mode = "FRAME_DROP"
     scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = 1280
     scene.render.resolution_y = 720
@@ -174,7 +191,7 @@ def create_scene(args: argparse.Namespace) -> bpy.types.Object:
     domain = setup_domain(preset, args.cache_dir)
     liquid_flow("Initial Water", (-0.25, 0.0, 1.15), (6.8, 4.5, 2.0))
     paddle = effector("Wave Paddle", (-4.55, 0.0, 1.65), (0.20, 4.7, 2.8))
-    animate_paddle(paddle)
+    animate_paddle(paddle, preset["frame_end"])
 
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=4, radius=1.0, location=(1.2, 0.0, 1.10))
     rock = bpy.context.active_object

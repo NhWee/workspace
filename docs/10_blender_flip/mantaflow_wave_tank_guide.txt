@@ -20,7 +20,9 @@ The generated scene contains:
 
 Quality
 -------
-preview: resolution 96 for iteration.
+preview: resolution 112 for iteration.
+long_preview: resolution 96, 360 frames, 48 fps. This is for a longer and
+faster-to-watch driven wave tank preview.
 production: resolution 256, higher mesh scale, and more time substeps. This is
 an offline bake and may take a long time depending on cache frames and GPU.
 
@@ -29,6 +31,20 @@ Create a preview scene
 From the project root:
 
   .\tools\blender-5.1.2\blender-5.1.2-windows-x64\blender.exe --background --python wave_sim\blender_fluid\create_mantaflow_wave_tank.py -- --quality preview
+
+Create and bake a longer fast-playback preview
+----------------------------------------------
+
+  .\tools\blender-5.1.2\blender-5.1.2-windows-x64\blender.exe --background --python wave_sim\blender_fluid\create_mantaflow_wave_tank.py -- --quality long_preview --output outputs\mantaflow_wave_tank_long_preview.blend --cache-dir outputs\mantaflow_wave_tank_long_preview_cache --bake
+
+Optional overrides:
+
+  --frame-end 480
+  --fps 60
+
+Higher fps makes the same baked frames play faster in Blender. Higher
+frame-end makes the simulation longer, but also increases bake time and cache
+size.
 
 Create and bake the production scene
 ------------------------------------
