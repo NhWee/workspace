@@ -19,6 +19,7 @@ The generated scene contains:
 5. multiple collision rocks that create breaking flow and splash
 6. liquid mesh and foam/bubble/spray settings
 7. Cycles/Filmic render settings for more realistic water previews
+8. foam and spray render proxy emitters around the main breaking zones
 
 Quality
 -------
@@ -69,14 +70,18 @@ The improved scene now considers:
 7. higher vorticity to preserve visible rotational motion
 8. lower surface tension for more active breaking behavior
 9. Cycles render settings, Filmic tone mapping, and denoising
+10. visible foam/spray render proxy particles near rocks and the absorbing
+    beach, used when Mantaflow's native secondary cache is sparse in short
+    preview bakes
 
 Still to improve
 ----------------
 
 The next realism gaps are:
 
-1. Foam particles need custom material/instancing so white foam is visible in
-   final renders, not just present in the simulation cache.
+1. Native Mantaflow secondary particles can still be sparse in short bakes.
+   The proxy emitters make foam visible, but a longer/high-resolution bake is
+   needed to tune this against the actual liquid motion.
 2. The absorbing beach is a geometric approximation, not a perfect open ocean
    boundary condition.
 3. The water material is still simple. A better shader should separate deep

@@ -135,6 +135,28 @@ def make_beach_material() -> bpy.types.Material:
     return material
 
 
+def make_foam_material() -> bpy.types.Material:
+    material = bpy.data.materials.new("White Foam")
+    material.use_nodes = True
+    principled = material.node_tree.nodes.get("Principled BSDF")
+    principled.inputs["Base Color"].default_value = (0.94, 0.97, 0.96, 1.0)
+    principled.inputs["Roughness"].default_value = 0.82
+    principled.inputs["Metallic"].default_value = 0.0
+    return material
+
+
+def make_spray_material() -> bpy.types.Material:
+    material = bpy.data.materials.new("Mist Spray")
+    material.use_nodes = True
+    principled = material.node_tree.nodes.get("Principled BSDF")
+    principled.inputs["Base Color"].default_value = (0.86, 0.95, 1.0, 1.0)
+    principled.inputs["Alpha"].default_value = 0.68
+    principled.inputs["Roughness"].default_value = 0.22
+    principled.inputs["Metallic"].default_value = 0.0
+    material.blend_method = "BLEND"
+    return material
+
+
 def make_water_material() -> bpy.types.Material:
     material = bpy.data.materials.new("Water")
     material.use_nodes = True
@@ -149,6 +171,138 @@ def make_water_material() -> bpy.types.Material:
     return material
 
 
+def particle_instance(name: str, radius: float, material: bpy.types.Material) -> bpy.types.Object:
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2, radius=radius, location=(0.0, 0.0, -100.0))
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.data.materials.append(material)
+    shade_smooth(obj)
+    obj.hide_viewport = True
+    return obj
+
+
+def configure_secondary_particle_render(domain: bpy.types.Object) -> None:
+    foam_object = bpy.data.objects.get("Foam Render Droplet") or particle_instance(
+        "Foam Render Droplet", 1.0, bpy.data.materials.get("White Foam") or make_foam_material()
+    )
+    spray_object = bpy.data.objects.get("Spray Render Droplet") or particle_instance(
+        "Spray Render Droplet", 1.0, bpy.data.materials.get("Mist Spray") or make_spray_material()
+    )
+    settings_by_name = {
+        "Foam": {"object": foam_object, "size": 0.060, "random": 0.72, "display": 100},
+        "Spray": {"object": spray_object, "size": 0.030, "random": 0.85, "display": 100},
+        "Bubbles": {"object": spray_object, "size": 0.018, "random": 0.65, "display": 45},
+        "Tracers": {"object": spray_object, "size": 0.014, "random": 0.80, "display": 25},
+        "Spray + Foam + Bubbles": {"object": foam_object, "size": 0.050, "random": 0.80, "display": 100},
+    }
+    for particle_system in domain.particle_systems:
+        config = settings_by_name.get(particle_system.name)
+        if not config:
+            continue
+        settings = particle_system.settings
+        settings.render_type = "OBJECT"
+        settings.instance_object = config["object"]
+        settings.particle_size = config["size"]
+        settings.size_random = config["random"]
+        settings.display_percentage = config["display"]
+        set_if_present(settings, "use_rotations", True)
+        set_if_present(settings, "use_modifier_stack", True)
+
+
+def foam_proxy_emitter(
+    name: str,
+    location: tuple[float, float, float],
+    dimensions: tuple[float, float, float],
+    frame_end: int,
+    count: int,
+    lifetime: int,
+    particle_size: float,
+    instance_object: bpy.types.Object,
+    upward: float,
+    sideways: float,
+) -> bpy.types.Object:
+    emitter = cube(name, location, dimensions)
+    bpy.context.view_layer.objects.active = emitter
+    emitter.select_set(True)
+    bpy.ops.object.particle_system_add()
+    particle_system = emitter.particle_systems[-1]
+    settings = particle_system.settings
+    settings.name = f"{name} Particles"
+    settings.count = count
+    settings.frame_start = 12
+    settings.frame_end = frame_end
+    settings.lifetime = lifetime
+    settings.lifetime_random = 0.65
+    settings.emit_from = "FACE"
+    settings.physics_type = "NEWTON"
+    settings.render_type = "OBJECT"
+    settings.instance_object = instance_object
+    settings.particle_size = particle_size
+    settings.size_random = 0.8
+    settings.normal_factor = upward
+    settings.tangent_factor = sideways
+    settings.object_align_factor[0] = 0.20
+    settings.object_align_factor[1] = 0.05
+    settings.object_align_factor[2] = upward * 0.35
+    settings.brownian_factor = 0.45
+    settings.drag_factor = 0.24
+    if hasattr(settings, "effector_weights"):
+        settings.effector_weights.gravity = 0.08
+    settings.display_percentage = 60
+    set_if_present(settings, "use_rotations", True)
+    emitter.hide_viewport = True
+    emitter.hide_render = False
+    emitter.show_instancer_for_render = False
+    emitter.show_instancer_for_viewport = False
+    emitter.select_set(False)
+    return emitter
+
+
+def setup_foam_proxy_emitters(frame_end: int) -> None:
+    foam_object = bpy.data.objects.get("Foam Render Droplet") or particle_instance(
+        "Foam Render Droplet", 1.0, bpy.data.materials.get("White Foam") or make_foam_material()
+    )
+    spray_object = bpy.data.objects.get("Spray Render Droplet") or particle_instance(
+        "Spray Render Droplet", 1.0, bpy.data.materials.get("Mist Spray") or make_spray_material()
+    )
+    foam_proxy_emitter(
+        "Rock Foam Proxy Emitter",
+        (2.35, 0.0, 1.55),
+        (3.4, 2.4, 0.06),
+        frame_end,
+        2600,
+        30,
+        0.040,
+        foam_object,
+        0.035,
+        0.18,
+    )
+    foam_proxy_emitter(
+        "Beach Foam Proxy Emitter",
+        (5.75, 0.0, 1.30),
+        (2.6, 4.8, 0.06),
+        frame_end,
+        1800,
+        36,
+        0.035,
+        foam_object,
+        0.025,
+        0.10,
+    )
+    foam_proxy_emitter(
+        "Breaking Spray Proxy Emitter",
+        (1.55, -0.15, 1.85),
+        (1.6, 1.4, 0.10),
+        frame_end,
+        950,
+        24,
+        0.022,
+        spray_object,
+        0.42,
+        0.28,
+    )
+
+
 def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
     domain = cube("Liquid Domain", DOMAIN_CENTER, DOMAIN_SIZE)
     modifier = domain.modifiers.new("Liquid Domain", type="FLUID")
@@ -161,6 +315,7 @@ def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
     settings.cache_frame_end = preset["frame_end"]
     settings.cache_directory = str(cache_dir.resolve())
     settings.cache_data_format = "OPENVDB"
+    set_if_present(settings, "cache_particle_format", "UNI")
     set_if_present(settings, "cache_mesh_format", "BOBJECT")
     settings.timesteps_min = 2
     settings.timesteps_max = preset["timesteps_max"]
@@ -178,10 +333,26 @@ def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
     set_if_present(settings, "particle_radius", 1.45)
     set_if_present(settings, "particle_band_width", 5)
     set_if_present(settings, "particle_number", 3)
-    set_if_present(settings, "particle_minimum", 8)
-    set_if_present(settings, "particle_maximum", 96)
-    set_if_present(settings, "particle_life", 90)
+    set_if_present(settings, "particle_min", 12)
+    set_if_present(settings, "particle_max", 128)
     set_if_present(settings, "particle_scale", 1)
+    set_if_present(settings, "sndparticle_combined_export", "SPRAY_FOAM_BUBBLES")
+    set_if_present(settings, "sndparticle_boundary", "PUSHOUT")
+    set_if_present(settings, "sndparticle_life_min", 28.0)
+    set_if_present(settings, "sndparticle_life_max", 110.0)
+    set_if_present(settings, "sndparticle_potential_min_wavecrest", 0.05)
+    set_if_present(settings, "sndparticle_potential_max_wavecrest", 30.0)
+    set_if_present(settings, "sndparticle_potential_min_trappedair", 0.05)
+    set_if_present(settings, "sndparticle_potential_max_trappedair", 35.0)
+    set_if_present(settings, "sndparticle_potential_min_energy", 0.02)
+    set_if_present(settings, "sndparticle_potential_max_energy", 25.0)
+    set_if_present(settings, "sndparticle_sampling_wavecrest", 600)
+    set_if_present(settings, "sndparticle_sampling_trappedair", 160)
+    set_if_present(settings, "sndparticle_potential_radius", 3)
+    set_if_present(settings, "sndparticle_update_radius", 3)
+    set_if_present(settings, "sndparticle_bubble_buoyancy", 0.72)
+    set_if_present(settings, "sndparticle_bubble_drag", 0.48)
+    set_if_present(settings, "sys_particle_maximum", 2500000)
     set_if_present(settings, "flip_ratio", 0.97)
     set_if_present(settings, "vorticity", 1.8)
     set_if_present(settings, "surface_tension", 0.25)
@@ -281,8 +452,7 @@ def setup_rendering(scene: bpy.types.Scene) -> None:
         scene.cycles.use_denoising = True
         scene.view_settings.view_transform = "Filmic"
         scene.view_settings.look = "Medium High Contrast"
-        scene.render.use_motion_blur = True
-        scene.render.motion_blur_shutter = 0.4
+        scene.render.use_motion_blur = False
     except Exception:
         scene.render.engine = "BLENDER_EEVEE"
 
@@ -313,9 +483,11 @@ def create_scene(args: argparse.Namespace) -> bpy.types.Object:
     paddle.display_type = "WIRE"
     animate_paddle(paddle, preset["frame_end"])
     setup_breakwater_rocks()
+    setup_foam_proxy_emitters(preset["frame_end"])
 
     water = make_water_material()
     domain.data.materials.append(water)
+    configure_secondary_particle_render(domain)
     setup_camera_and_lights()
     return domain
 
@@ -329,6 +501,7 @@ def bake(domain: bpy.types.Object) -> None:
         bpy.ops.fluid.bake_particles()
     except RuntimeError:
         pass
+    configure_secondary_particle_render(domain)
 
 
 def main() -> None:
