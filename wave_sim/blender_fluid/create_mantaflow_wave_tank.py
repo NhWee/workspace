@@ -428,7 +428,7 @@ def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
     # Mantaflow attaches the generated liquid mesh to the domain object, so
     # hiding the domain would also hide the baked water surface.
     domain.hide_render = False
-    domain.display_type = "WIRE"
+    domain.display_type = "TEXTURED"
     smooth = domain.modifiers.new("Render Surface Smoothing", type="SMOOTH")
     smooth.factor = 0.35
     smooth.iterations = 2
@@ -581,9 +581,11 @@ def main() -> None:
     domain = create_scene(args)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.cache_dir.mkdir(parents=True, exist_ok=True)
+    bpy.context.scene.frame_set(min(45, bpy.context.scene.frame_end))
     bpy.ops.wm.save_as_mainfile(filepath=str(args.output.resolve()))
     if args.bake:
         bake(domain)
+        bpy.context.scene.frame_set(min(45, bpy.context.scene.frame_end))
         bpy.ops.wm.save_as_mainfile(filepath=str(args.output.resolve()))
     print(f"Saved Mantaflow wave tank: {args.output}")
 
