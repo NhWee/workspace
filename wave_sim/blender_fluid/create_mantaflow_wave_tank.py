@@ -423,8 +423,8 @@ def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
     set_if_present(settings, "sndparticle_bubble_drag", 0.48)
     set_if_present(settings, "sys_particle_maximum", 2500000)
     set_if_present(settings, "flip_ratio", 0.97)
-    set_if_present(settings, "vorticity", 2.8)
-    set_if_present(settings, "surface_tension", 0.25)
+    set_if_present(settings, "vorticity", 1.45)
+    set_if_present(settings, "surface_tension", 0.55)
     # Mantaflow attaches the generated liquid mesh to the domain object, so
     # hiding the domain would also hide the baked water surface.
     domain.hide_render = False
@@ -442,12 +442,16 @@ def animate_paddle(paddle: bpy.types.Object, frame_end: int) -> None:
     # safer way to generate rotating flow than a hard vortex force field.
     for frame in range(1, frame_end + 25, 12):
         t = frame / 30.0
-        stroke = 0.72 * math.sin(2.0 * math.pi * t / 2.6)
-        stroke += 0.28 * math.sin(2.0 * math.pi * t / 1.35 + 0.7)
+        if frame <= 60:
+            envelope = 1.0
+        else:
+            envelope = max(0.25, 1.0 - 0.75 * (frame - 60) / max(1, frame_end - 60))
+        stroke = envelope * 0.34 * math.sin(2.0 * math.pi * t / 2.6)
+        stroke += envelope * 0.10 * math.sin(2.0 * math.pi * t / 1.35 + 0.7)
         paddle.location.x = -6.95 + stroke
-        paddle.location.y = 0.34 * math.sin(2.0 * math.pi * t / 3.8 + 1.1)
-        paddle.rotation_euler[1] = math.radians(4.0 * math.sin(2.0 * math.pi * t / 1.8))
-        paddle.rotation_euler[2] = math.radians(7.5 * math.sin(2.0 * math.pi * t / 3.2 + 0.4))
+        paddle.location.y = envelope * 0.12 * math.sin(2.0 * math.pi * t / 3.8 + 1.1)
+        paddle.rotation_euler[1] = math.radians(envelope * 1.6 * math.sin(2.0 * math.pi * t / 1.8))
+        paddle.rotation_euler[2] = math.radians(envelope * 2.4 * math.sin(2.0 * math.pi * t / 3.2 + 0.4))
         paddle.keyframe_insert(data_path="location", index=0, frame=frame)
         paddle.keyframe_insert(data_path="location", index=1, frame=frame)
         paddle.keyframe_insert(data_path="rotation_euler", index=1, frame=frame)
@@ -461,10 +465,10 @@ def setup_absorbing_beach_and_tank() -> None:
         [
             (4.8, -2.95, 0.00),
             (8.95, -2.95, 0.00),
-            (8.95, -2.95, 2.15),
+            (8.95, -2.95, 0.95),
             (4.8, 2.95, 0.00),
             (8.95, 2.95, 0.00),
-            (8.95, 2.95, 2.15),
+            (8.95, 2.95, 0.95),
         ],
         [(0, 1, 2), (3, 5, 4), (0, 3, 4, 1), (1, 4, 5, 2), (0, 2, 5, 3)],
     )
@@ -484,8 +488,8 @@ def setup_vortex_current_deflectors() -> None:
     # cluster. They are collision geometry, but hidden in renders so the scene
     # still reads as water moving around natural obstacles.
     deflectors = [
-        ("Submerged Vortex Deflector A", (0.60, -1.30, 0.58), (2.20, 0.12, 0.46), -24.0),
-        ("Submerged Vortex Deflector B", (2.95, 1.18, 0.50), (1.65, 0.11, 0.38), 32.0),
+        ("Submerged Vortex Deflector A", (0.60, -1.30, 0.34), (1.25, 0.06, 0.16), -9.0),
+        ("Submerged Vortex Deflector B", (2.95, 1.18, 0.32), (0.95, 0.06, 0.14), 12.0),
     ]
     for name, location, dimensions, angle in deflectors:
         obj = effector(name, location, dimensions)

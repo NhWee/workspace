@@ -50,6 +50,16 @@ Create and bake the improved ocean-style preview
 
   .\tools\blender-5.1.2\blender-5.1.2-windows-x64\blender.exe --background --python wave_sim\blender_fluid\create_mantaflow_wave_tank.py -- --quality ocean_preview --output outputs\mantaflow_wave_tank_ocean_preview.blend --cache-dir outputs\mantaflow_wave_tank_ocean_preview_cache --bake
 
+Create and bake a longer vortex-flow preview
+--------------------------------------------
+
+  .\tools\blender-5.1.2\blender-5.1.2-windows-x64\blender.exe --background --python wave_sim\blender_fluid\create_mantaflow_wave_tank.py -- --quality ocean_preview --output outputs\mantaflow_wave_tank_vortex_flow_stable_long_v3.blend --cache-dir outputs\mantaflow_wave_tank_vortex_flow_stable_long_v3_cache --frame-end 180 --fps 30 --bake
+
+This creates 180 baked frames. The cache is several GB and should stay local.
+For long runs, the paddle force tapers after the early frames and the absorbing
+beach is lower so the water is less likely to climb into a tall wall late in
+the simulation.
+
 Optional overrides:
 
   --frame-end 480
@@ -84,6 +94,9 @@ The improved scene now considers:
 13. oblique wave forcing: the paddle now sways sideways and yaws slightly, while
     low submerged deflectors push part of the flow around the rocks. This gives
     the vortex effect a physical source without using a hard vortex force field.
+14. long-run stability: the paddle force now tapers after the first part of the
+    run, the submerged deflectors are weaker, and the absorbing beach is lower
+    to reduce late-frame energy buildup.
 
 Still to improve
 ----------------
