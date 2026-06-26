@@ -20,6 +20,7 @@ The generated scene contains:
 6. liquid mesh and foam/bubble/spray settings
 7. Cycles/Filmic render settings for more realistic water previews
 8. foam and spray render proxy emitters around the main breaking zones
+9. an annular vortex foam emitter around the rock zone
 
 Quality
 -------
@@ -73,6 +74,11 @@ The improved scene now considers:
 10. visible foam/spray render proxy particles near rocks and the absorbing
     beach, used when Mantaflow's native secondary cache is sparse in short
     preview bakes
+11. stronger mesh smoothing and a render smoothing modifier for softer preview
+    surfaces
+12. a stable vortex-foam ring around the breaking zone. Strong hidden vortex
+    collision drivers were tested but removed because they produced unrealistic
+    vertical water columns in short bakes.
 
 Still to improve
 ----------------
@@ -88,6 +94,9 @@ The next realism gaps are:
    water, thin crests, foam, and spray.
 4. Full production bakes should use longer frame ranges and higher resolution,
    but they will create large local cache folders.
+5. A physically coupled vortex should be revisited later with a proper velocity
+   field or higher-resolution FLIP setup. The current version keeps the liquid
+   stable and shows the rotating region through foam placement.
 
 Create and bake the production scene
 ------------------------------------

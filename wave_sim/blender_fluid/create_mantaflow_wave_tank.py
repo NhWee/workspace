@@ -258,6 +258,66 @@ def foam_proxy_emitter(
     return emitter
 
 
+def annular_foam_proxy_emitter(
+    name: str,
+    location: tuple[float, float, float],
+    inner_radius: float,
+    outer_radius: float,
+    frame_end: int,
+    count: int,
+    instance_object: bpy.types.Object,
+) -> bpy.types.Object:
+    vertices = []
+    faces = []
+    segments = 48
+    for index in range(segments):
+        angle = 2.0 * math.pi * index / segments
+        ca = math.cos(angle)
+        sa = math.sin(angle)
+        vertices.append((location[0] + inner_radius * ca, location[1] + inner_radius * sa, location[2]))
+        vertices.append((location[0] + outer_radius * ca, location[1] + outer_radius * sa, location[2]))
+    for index in range(segments):
+        next_index = (index + 1) % segments
+        faces.append((2 * index, 2 * next_index, 2 * next_index + 1, 2 * index + 1))
+
+    mesh = bpy.data.meshes.new(f"{name} Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    emitter = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(emitter)
+    bpy.context.view_layer.objects.active = emitter
+    emitter.select_set(True)
+    bpy.ops.object.particle_system_add()
+    particle_system = emitter.particle_systems[-1]
+    settings = particle_system.settings
+    settings.name = f"{name} Particles"
+    settings.count = count
+    settings.frame_start = 10
+    settings.frame_end = frame_end
+    settings.lifetime = 42
+    settings.lifetime_random = 0.62
+    settings.emit_from = "FACE"
+    settings.physics_type = "NEWTON"
+    settings.render_type = "OBJECT"
+    settings.instance_object = instance_object
+    settings.particle_size = 0.028
+    settings.size_random = 0.82
+    settings.normal_factor = 0.018
+    settings.tangent_factor = 0.52
+    settings.brownian_factor = 0.32
+    settings.drag_factor = 0.18
+    if hasattr(settings, "effector_weights"):
+        settings.effector_weights.gravity = 0.05
+    settings.display_percentage = 70
+    set_if_present(settings, "use_rotations", True)
+    emitter.hide_viewport = True
+    emitter.hide_render = False
+    emitter.show_instancer_for_render = False
+    emitter.show_instancer_for_viewport = False
+    emitter.select_set(False)
+    return emitter
+
+
 def setup_foam_proxy_emitters(frame_end: int) -> None:
     foam_object = bpy.data.objects.get("Foam Render Droplet") or particle_instance(
         "Foam Render Droplet", 1.0, bpy.data.materials.get("White Foam") or make_foam_material()
@@ -301,6 +361,15 @@ def setup_foam_proxy_emitters(frame_end: int) -> None:
         0.42,
         0.28,
     )
+    annular_foam_proxy_emitter(
+        "Vortex Foam Ring Proxy Emitter",
+        (2.35, 0.05, 1.45),
+        0.42,
+        1.05,
+        frame_end,
+        2100,
+        foam_object,
+    )
 
 
 def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
@@ -324,8 +393,8 @@ def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
     settings.use_mesh = True
     settings.mesh_scale = preset["mesh_scale"]
     set_if_present(settings, "mesh_particle_radius", 1.55)
-    set_if_present(settings, "mesh_smoothen_pos", 4)
-    set_if_present(settings, "mesh_smoothen_neg", 4)
+    set_if_present(settings, "mesh_smoothen_pos", 8)
+    set_if_present(settings, "mesh_smoothen_neg", 8)
     set_if_present(settings, "use_foam_particles", True)
     set_if_present(settings, "use_bubble_particles", True)
     set_if_present(settings, "use_spray_particles", True)
@@ -354,12 +423,15 @@ def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
     set_if_present(settings, "sndparticle_bubble_drag", 0.48)
     set_if_present(settings, "sys_particle_maximum", 2500000)
     set_if_present(settings, "flip_ratio", 0.97)
-    set_if_present(settings, "vorticity", 1.8)
+    set_if_present(settings, "vorticity", 2.8)
     set_if_present(settings, "surface_tension", 0.25)
     # Mantaflow attaches the generated liquid mesh to the domain object, so
     # hiding the domain would also hide the baked water surface.
     domain.hide_render = False
     domain.display_type = "WIRE"
+    smooth = domain.modifiers.new("Render Surface Smoothing", type="SMOOTH")
+    smooth.factor = 0.35
+    smooth.iterations = 2
     return domain
 
 
