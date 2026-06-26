@@ -437,15 +437,21 @@ def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
 
 def animate_paddle(paddle: bpy.types.Object, frame_end: int) -> None:
     # Combine two stroke periods so the tank receives uneven wave groups
-    # instead of a single mechanical back-and-forth pulse.
+    # instead of a single mechanical back-and-forth pulse. A small lateral sway
+    # and yaw angle make the incoming wave hit the rocks obliquely, which is a
+    # safer way to generate rotating flow than a hard vortex force field.
     for frame in range(1, frame_end + 25, 12):
         t = frame / 30.0
         stroke = 0.72 * math.sin(2.0 * math.pi * t / 2.6)
         stroke += 0.28 * math.sin(2.0 * math.pi * t / 1.35 + 0.7)
         paddle.location.x = -6.95 + stroke
+        paddle.location.y = 0.34 * math.sin(2.0 * math.pi * t / 3.8 + 1.1)
         paddle.rotation_euler[1] = math.radians(4.0 * math.sin(2.0 * math.pi * t / 1.8))
+        paddle.rotation_euler[2] = math.radians(7.5 * math.sin(2.0 * math.pi * t / 3.2 + 0.4))
         paddle.keyframe_insert(data_path="location", index=0, frame=frame)
+        paddle.keyframe_insert(data_path="location", index=1, frame=frame)
         paddle.keyframe_insert(data_path="rotation_euler", index=1, frame=frame)
+        paddle.keyframe_insert(data_path="rotation_euler", index=2, frame=frame)
 
 def setup_absorbing_beach_and_tank() -> None:
     # The sloped beach dissipates wave energy before it reaches the right wall,
@@ -469,6 +475,21 @@ def setup_absorbing_beach_and_tank() -> None:
     back_wall = effector("Back Side Wall", (1.5, 3.0, 2.0), (17.6, 0.12, 4.0))
     front_wall = effector("Front Side Wall", (1.5, -3.0, 2.0), (17.6, 0.12, 4.0))
     for obj in (floor, left_wall, back_wall, front_wall):
+        obj.hide_render = True
+        obj.display_type = "WIRE"
+
+
+def setup_vortex_current_deflectors() -> None:
+    # Low submerged fins bias the flow sideways before it reaches the rock
+    # cluster. They are collision geometry, but hidden in renders so the scene
+    # still reads as water moving around natural obstacles.
+    deflectors = [
+        ("Submerged Vortex Deflector A", (0.60, -1.30, 0.58), (2.20, 0.12, 0.46), -24.0),
+        ("Submerged Vortex Deflector B", (2.95, 1.18, 0.50), (1.65, 0.11, 0.38), 32.0),
+    ]
+    for name, location, dimensions, angle in deflectors:
+        obj = effector(name, location, dimensions)
+        obj.rotation_euler[2] = math.radians(angle)
         obj.hide_render = True
         obj.display_type = "WIRE"
 
@@ -554,6 +575,7 @@ def create_scene(args: argparse.Namespace) -> bpy.types.Object:
     paddle.hide_render = True
     paddle.display_type = "WIRE"
     animate_paddle(paddle, preset["frame_end"])
+    setup_vortex_current_deflectors()
     setup_breakwater_rocks()
     setup_foam_proxy_emitters(preset["frame_end"])
 
