@@ -24,8 +24,12 @@ PRESETS = {
     "production": {"resolution": 256, "frame_end": 360, "timesteps_max": 10, "mesh_scale": 4, "fps": 30},
 }
 
-DOMAIN_SIZE = (18.0, 6.0, 5.5)
-DOMAIN_CENTER = (1.5, 0.0, 2.75)
+DOMAIN_SIZE = (23.0, 7.0, 5.5)
+DOMAIN_CENTER = (2.0, 0.0, 2.75)
+DOMAIN_MIN_X = DOMAIN_CENTER[0] - DOMAIN_SIZE[0] * 0.5
+DOMAIN_MAX_X = DOMAIN_CENTER[0] + DOMAIN_SIZE[0] * 0.5
+DOMAIN_MIN_Y = DOMAIN_CENTER[1] - DOMAIN_SIZE[1] * 0.5
+DOMAIN_MAX_Y = DOMAIN_CENTER[1] + DOMAIN_SIZE[1] * 0.5
 
 
 def script_args() -> argparse.Namespace:
@@ -93,6 +97,20 @@ def liquid_flow(name: str, location: tuple[float, float, float], dimensions: tup
         settings.keyframe_insert(data_path="use_inflow", frame=2)
     set_if_present(settings, "surface_distance", 1.5)
     set_if_present(settings, "subframes", 2)
+    obj.hide_render = True
+    obj.display_type = "WIRE"
+    return obj
+
+
+def liquid_outflow(name: str, location: tuple[float, float, float], dimensions: tuple[float, float, float]) -> bpy.types.Object:
+    obj = cube(name, location, dimensions)
+    modifier = obj.modifiers.new("Liquid Outflow", type="FLUID")
+    modifier.fluid_type = "FLOW"
+    settings = modifier.flow_settings
+    settings.flow_type = "LIQUID"
+    settings.flow_behavior = "OUTFLOW"
+    set_if_present(settings, "surface_distance", 0.02)
+    set_if_present(settings, "subframes", 3)
     obj.hide_render = True
     obj.display_type = "WIRE"
     return obj
@@ -345,8 +363,8 @@ def setup_foam_proxy_emitters(frame_end: int) -> None:
     )
     foam_proxy_emitter(
         "Beach Foam Proxy Emitter",
-        (5.75, 0.0, 1.30),
-        (2.6, 4.8, 0.06),
+        (7.2, 0.0, 1.18),
+        (3.3, 5.3, 0.06),
         frame_end,
         1800,
         36,
@@ -396,11 +414,12 @@ def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
     settings.timesteps_max = preset["timesteps_max"]
     settings.cfl_condition = 1.5
     settings.gravity = (0.0, 0.0, -9.81)
+    set_if_present(settings, "delete_in_obstacle", True)
     settings.use_mesh = True
     settings.mesh_scale = preset["mesh_scale"]
-    set_if_present(settings, "mesh_particle_radius", 1.55)
-    set_if_present(settings, "mesh_smoothen_pos", 8)
-    set_if_present(settings, "mesh_smoothen_neg", 8)
+    set_if_present(settings, "mesh_particle_radius", 1.48)
+    set_if_present(settings, "mesh_smoothen_pos", 10)
+    set_if_present(settings, "mesh_smoothen_neg", 10)
     set_if_present(settings, "use_foam_particles", True)
     set_if_present(settings, "use_bubble_particles", True)
     set_if_present(settings, "use_spray_particles", True)
@@ -428,9 +447,9 @@ def setup_domain(preset: dict[str, int], cache_dir: Path) -> bpy.types.Object:
     set_if_present(settings, "sndparticle_bubble_buoyancy", 0.72)
     set_if_present(settings, "sndparticle_bubble_drag", 0.48)
     set_if_present(settings, "sys_particle_maximum", 2500000)
-    set_if_present(settings, "flip_ratio", 0.97)
-    set_if_present(settings, "vorticity", 1.45)
-    set_if_present(settings, "surface_tension", 0.55)
+    set_if_present(settings, "flip_ratio", 0.96)
+    set_if_present(settings, "vorticity", 1.20)
+    set_if_present(settings, "surface_tension", 0.62)
     # Mantaflow attaches the generated liquid mesh to the domain object, so
     # hiding the domain would also hide the baked water surface.
     domain.hide_render = False
@@ -446,47 +465,52 @@ def animate_paddle(paddle: bpy.types.Object, frame_end: int) -> None:
     # instead of a single mechanical back-and-forth pulse. A small lateral sway
     # and yaw angle make the incoming wave hit the rocks obliquely, which is a
     # safer way to generate rotating flow than a hard vortex force field.
+    base_x = DOMAIN_MIN_X + 0.55
     for frame in range(1, frame_end + 25, 12):
         t = frame / 30.0
-        if frame <= 60:
+        if frame <= 45:
             envelope = 1.0
         else:
-            envelope = max(0.25, 1.0 - 0.75 * (frame - 60) / max(1, frame_end - 60))
-        stroke = envelope * 0.34 * math.sin(2.0 * math.pi * t / 2.6)
-        stroke += envelope * 0.10 * math.sin(2.0 * math.pi * t / 1.35 + 0.7)
-        paddle.location.x = -6.95 + stroke
-        paddle.location.y = envelope * 0.12 * math.sin(2.0 * math.pi * t / 3.8 + 1.1)
-        paddle.rotation_euler[1] = math.radians(envelope * 1.6 * math.sin(2.0 * math.pi * t / 1.8))
-        paddle.rotation_euler[2] = math.radians(envelope * 2.4 * math.sin(2.0 * math.pi * t / 3.2 + 0.4))
+            envelope = max(0.08, 1.0 - 0.92 * (frame - 45) / max(1, frame_end - 45))
+        stroke = envelope * 0.26 * math.sin(2.0 * math.pi * t / 2.8)
+        stroke += envelope * 0.06 * math.sin(2.0 * math.pi * t / 1.55 + 0.7)
+        paddle.location.x = base_x + stroke
+        paddle.location.y = envelope * 0.10 * math.sin(2.0 * math.pi * t / 3.8 + 1.1)
+        paddle.rotation_euler[1] = math.radians(envelope * 1.2 * math.sin(2.0 * math.pi * t / 1.8))
+        paddle.rotation_euler[2] = math.radians(envelope * 2.0 * math.sin(2.0 * math.pi * t / 3.2 + 0.4))
         paddle.keyframe_insert(data_path="location", index=0, frame=frame)
         paddle.keyframe_insert(data_path="location", index=1, frame=frame)
         paddle.keyframe_insert(data_path="rotation_euler", index=1, frame=frame)
         paddle.keyframe_insert(data_path="rotation_euler", index=2, frame=frame)
 
+
 def setup_absorbing_beach_and_tank() -> None:
-    # The sloped beach dissipates wave energy before it reaches the right wall,
-    # reducing the tall reflected sheet that appeared in earlier previews.
+    # The long sloped beach reduces reflected waves before the outflow deletes
+    # outgoing liquid near the far end of the domain.
     beach = mesh_effector(
         "Sloped Absorbing Beach",
         [
-            (4.8, -2.95, 0.00),
-            (8.95, -2.95, 0.00),
-            (8.95, -2.95, 0.95),
-            (4.8, 2.95, 0.00),
-            (8.95, 2.95, 0.00),
-            (8.95, 2.95, 0.95),
+            (5.4, DOMAIN_MIN_Y + 0.20, 0.00),
+            (11.7, DOMAIN_MIN_Y + 0.20, 0.00),
+            (11.7, DOMAIN_MIN_Y + 0.20, 0.65),
+            (5.4, DOMAIN_MAX_Y - 0.20, 0.00),
+            (11.7, DOMAIN_MAX_Y - 0.20, 0.00),
+            (11.7, DOMAIN_MAX_Y - 0.20, 0.65),
         ],
         [(0, 1, 2), (3, 5, 4), (0, 3, 4, 1), (1, 4, 5, 2), (0, 2, 5, 3)],
     )
     beach.data.materials.append(make_beach_material())
 
-    floor = effector("Tank Floor", (1.5, 0.0, -0.08), (17.6, 5.8, 0.16))
-    left_wall = effector("Left Wave Wall", (-7.35, 0.0, 2.0), (0.18, 5.8, 4.0))
-    back_wall = effector("Back Side Wall", (1.5, 3.0, 2.0), (17.6, 0.12, 4.0))
-    front_wall = effector("Front Side Wall", (1.5, -3.0, 2.0), (17.6, 0.12, 4.0))
+    floor = effector("Tank Floor", (DOMAIN_CENTER[0], 0.0, -0.08), (DOMAIN_SIZE[0] - 0.35, 6.75, 0.16))
+    left_wall = effector("Left Wave Wall", (DOMAIN_MIN_X + 0.12, 0.0, 2.0), (0.18, 6.75, 4.0))
+    back_wall = effector("Back Side Wall", (DOMAIN_CENTER[0], DOMAIN_MAX_Y - 0.08, 2.0), (DOMAIN_SIZE[0] - 0.35, 0.12, 4.0))
+    front_wall = effector("Front Side Wall", (DOMAIN_CENTER[0], DOMAIN_MIN_Y + 0.08, 2.0), (DOMAIN_SIZE[0] - 0.35, 0.12, 4.0))
     for obj in (floor, left_wall, back_wall, front_wall):
         obj.hide_render = True
         obj.display_type = "WIRE"
+
+    liquid_outflow("Right Open Boundary Outflow", (DOMAIN_MAX_X - 0.55, 0.0, 1.25), (0.80, 6.4, 2.5))
+    liquid_outflow("High Sheet Cleanup Outflow", (DOMAIN_CENTER[0], 0.0, 4.25), (DOMAIN_SIZE[0] - 0.5, 6.4, 1.9))
 
 
 def setup_vortex_current_deflectors() -> None:
@@ -583,9 +607,9 @@ def create_scene(args: argparse.Namespace) -> bpy.types.Object:
     setup_rendering(scene)
 
     domain = setup_domain(preset, args.cache_dir)
-    liquid_flow("Initial Water", (-1.35, 0.0, 1.05), (9.2, 5.25, 1.9))
+    liquid_flow("Initial Water", (-2.2, 0.0, 1.05), (12.0, 6.15, 1.9))
     setup_absorbing_beach_and_tank()
-    paddle = effector("Wave Paddle", (-6.95, 0.0, 1.45), (0.24, 5.55, 2.5))
+    paddle = effector("Wave Paddle", (DOMAIN_MIN_X + 0.55, 0.0, 1.45), (0.24, 6.35, 2.5))
     paddle.hide_render = True
     paddle.display_type = "WIRE"
     animate_paddle(paddle, preset["frame_end"])

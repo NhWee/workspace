@@ -12,7 +12,7 @@ Scene
 -----
 The generated scene contains:
 
-1. an 18 x 6 x 5.5 liquid domain
+1. a 23 x 7 x 5.5 liquid domain
 2. an initial liquid volume
 3. a hidden animated paddle that injects uneven wave-group energy
 4. a sloped absorbing beach that reduces hard-wall reflection
@@ -23,6 +23,12 @@ The generated scene contains:
 9. an annular vortex foam emitter around the rock zone
 10. asymmetric paddle sway/yaw and hidden submerged deflectors that bias the
     liquid into a rotating path near the rock cluster
+11. a hidden right-side liquid outflow region that deletes outgoing water before
+    it piles up against the domain boundary
+12. stronger liquid mesh smoothing to reduce detached sheet artifacts during
+    longer runs without making the water look overly viscous
+13. a high cleanup outflow that removes large airborne liquid sheet artifacts
+    while foam/spray particles continue to represent fine water breakup
 
 Quality
 -------
@@ -56,9 +62,9 @@ Create and bake a longer vortex-flow preview
   .\tools\blender-5.1.2\blender-5.1.2-windows-x64\blender.exe --background --python wave_sim\blender_fluid\create_mantaflow_wave_tank.py -- --quality ocean_preview --output outputs\mantaflow_wave_tank_vortex_flow_stable_long_v3.blend --cache-dir outputs\mantaflow_wave_tank_vortex_flow_stable_long_v3_cache --frame-end 180 --fps 30 --bake
 
 This creates 180 baked frames. The cache is several GB and should stay local.
-For long runs, the paddle force tapers after the early frames and the absorbing
-beach is lower so the water is less likely to climb into a tall wall late in
-the simulation.
+For long runs, the paddle force tapers after the early frames, the absorbing
+beach is longer and lower, and a hidden right-side liquid outflow deletes water
+before it piles up against the domain boundary.
 
 Create and bake a long cache with a stable playback range
 ---------------------------------------------------------
@@ -66,11 +72,10 @@ Create and bake a long cache with a stable playback range
   .\tools\blender-5.1.2\blender-5.1.2-windows-x64\blender.exe --background --python wave_sim\blender_fluid\create_mantaflow_wave_tank.py -- --quality ocean_preview --output outputs\mantaflow_wave_tank_vortex_flow_viewable_long.blend --cache-dir outputs\mantaflow_wave_tank_vortex_flow_viewable_long_cache --frame-end 180 --playback-end 75 --fps 15 --bake
 
 This still simulates a longer 180-frame cache, but the visible Blender timeline
-ends at frame 75. In the current closed wave tank, frames after roughly 75-90
-can become unstable because fluid reflects from the right boundary, piles up
-near the beach/wall region, and can separate into unrealistic floating sheets.
-The shorter playback range keeps the file on the stable, useful part of the
-bake while preserving the option to inspect later cached frames manually.
+ends at frame 75. Earlier versions used this mainly to hide late-frame closed
+tank instability. The current version also adds a right-side outflow, so longer
+bakes should shed more outgoing water instead of trapping it near the end wall.
+The shorter playback range is still useful when iterating quickly.
 
 Optional overrides:
 
@@ -114,6 +119,15 @@ The improved scene now considers:
 15. playback trimming: a long cache can be baked while Blender opens on a
     shorter stable timeline, avoiding late-frame boundary artifacts during
     normal playback.
+16. right-side outflow: outgoing liquid is removed before it can repeatedly
+    reflect, scatter through the domain, and reconnect as unrealistic floating
+    blobs.
+17. moderated FLIP energy and mesh smoothing: the wave motion remains active,
+    but the reconstructed mesh is less likely to connect thin detached sheets
+    into unrealistic floating blobs.
+18. airborne sheet cleanup: high blue liquid chunks are removed from the FLIP
+    mesh so visible spray is carried mainly by secondary/proxy particles rather
+    than unrealistic solid-looking water fragments.
 
 Still to improve
 ----------------
@@ -123,8 +137,8 @@ The next realism gaps are:
 1. Native Mantaflow secondary particles can still be sparse in short bakes.
    The proxy emitters make foam visible, but a longer/high-resolution bake is
    needed to tune this against the actual liquid motion.
-2. The absorbing beach is a geometric approximation, not a perfect open ocean
-   boundary condition.
+2. The absorbing beach and outflow are practical approximations, not a perfect
+   open ocean radiation boundary condition.
 3. The water material is still simple. A better shader should separate deep
    water, thin crests, foam, and spray.
 4. Full production bakes should use longer frame ranges and higher resolution,
@@ -133,9 +147,9 @@ The next realism gaps are:
    velocity field or higher-resolution FLIP setup. The current version keeps
    the liquid stable, adds asymmetric flow forcing, and shows the rotating
    region through foam placement.
-6. Long open-ocean behavior needs a better outlet/sponge boundary or a larger
-   domain. Playback trimming hides the broken late section, but it does not
-   solve the underlying closed-tank accumulation.
+6. Long open-ocean behavior would still benefit from a true sponge/radiation
+   boundary. The current outflow is a major improvement over a closed tank, but
+   it is still an approximation.
 
 Create and bake the production scene
 ------------------------------------
