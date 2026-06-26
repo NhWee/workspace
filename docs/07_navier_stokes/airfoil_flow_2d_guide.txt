@@ -1,0 +1,134 @@
+2D airfoil flow experiment guide
+================================
+
+File
+----
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\wave_sim\navier_stokes\airfoil_flow_2d.py
+
+What this makes
+---------------
+This script is the first airplane-wing style flow experiment in the project.
+It places a NACA 4-digit airfoil inside a 2D incompressible velocity field and
+pushes air from the left side of the domain.
+
+The output HTML has three panels:
+
+1. vorticity / wake
+   This shows curl(u, v). Strong positive and negative regions show rotating
+   flow and wake structures behind the airfoil.
+
+2. speed field
+   This shows how fast the air is moving around the airfoil.
+
+3. pressure-like field
+   This shows the pressure variable from the projection solve. It is useful
+   for qualitative comparison around the upper and lower airfoil surfaces, but
+   it is not yet a calibrated engineering pressure coefficient.
+
+Equations
+---------
+The velocity field follows the 2D incompressible Navier-Stokes equations:
+
+du/dt + (u dot grad)u = -grad(p) + viscosity * laplacian(u) + force
+div(u) = 0
+
+Here:
+
+u, v       = horizontal and vertical velocity components
+p          = pressure-like projection variable
+viscosity  = how quickly small vortices are smoothed out
+force      = small inlet perturbation used to make the wake visible
+
+The code uses this loop:
+
+1. advect velocity through the current velocity field
+2. add a small inlet perturbation
+3. diffuse velocity using viscosity
+4. impose inlet, outlet, wall, and airfoil obstacle boundary conditions
+5. solve pressure with Jacobi iterations
+6. subtract pressure gradient so div(u) is close to zero
+7. save vorticity, speed, and pressure-like frames
+
+Airfoil model
+-------------
+The airfoil is a NACA 4-digit section converted into a solid obstacle mask.
+For example:
+
+NACA0012 = symmetric 12 percent thickness airfoil
+NACA2412 = cambered 12 percent thickness airfoil
+
+The current script is a qualitative 2D flow visualization. It is useful for
+seeing wake, circulation, and angle-of-attack effects. It is not yet a full CFD
+tool for validated lift/drag numbers.
+
+Useful parameters
+-----------------
+--size-x, --size-y
+Grid resolution. Higher values produce smoother wakes but cost more GPU time.
+
+--steps
+Total simulation steps.
+
+--frame-every
+Saves one animation frame every N simulation steps. Lower values are smoother
+but create larger HTML files.
+
+--dt
+Simulation time step. Smaller is more stable. Larger can create stronger wake
+motion but may become unstable.
+
+--viscosity
+Kinematic viscosity. Lower values preserve sharper vortices. Higher values make
+the wake smoother and calmer.
+
+--pressure-iters
+Jacobi pressure projection iterations. Higher values make the velocity field
+more incompressible but cost more time.
+
+--inlet-velocity
+Left boundary flow speed.
+
+--angle-of-attack
+Airfoil angle in degrees. Higher values create a stronger asymmetric wake and
+can show separation-like behavior in this simplified model.
+
+--chord
+Airfoil chord length as a fraction of the domain width.
+
+--naca
+NACA 4-digit airfoil name, such as NACA0012 or NACA2412.
+
+--perturbation
+Strength of the inlet disturbance. Higher values make vortices appear more
+clearly behind the airfoil.
+
+Example
+-------
+From the project root:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_flow_2d
+
+More dramatic wake:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_flow_2d --angle-of-attack 12 --inlet-velocity 0.58 --perturbation 1.6 --viscosity 0.000025 --steps 1200
+
+Smoother/heavier run:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_flow_2d --size-x 320 --size-y 160 --pressure-iters 120 --steps 1400 --frame-every 4
+
+Output
+------
+By default, the HTML viewer is written to:
+
+outputs\airfoil_flow_2d.html
+
+How this connects to future work
+--------------------------------
+This is the first step toward wing/air-flow simulation. Next improvements could
+include:
+
+1. lift and drag estimation from pressure and wall stress
+2. streamlines or particle tracers around the airfoil
+3. better obstacle boundary handling near the airfoil surface
+4. Reynolds-number-oriented parameter presets
+5. 3D finite wing wake and wingtip vortex visualization
