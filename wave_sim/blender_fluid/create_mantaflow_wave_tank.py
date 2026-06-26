@@ -34,6 +34,12 @@ def script_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, default=Path("outputs/mantaflow_wave_tank.blend"))
     parser.add_argument("--cache-dir", type=Path, default=Path("outputs/mantaflow_wave_tank_cache"))
     parser.add_argument("--frame-end", type=int, default=None, help="Override the preset timeline length.")
+    parser.add_argument(
+        "--playback-end",
+        type=int,
+        default=None,
+        help="Optional visible timeline end. The simulation cache can be longer than the playback range.",
+    )
     parser.add_argument("--fps", type=int, default=None, help="Override the scene playback frame rate.")
     parser.add_argument("--bake", action="store_true", help="Bake data, mesh, and secondary particles after scene creation.")
     return parser.parse_args(sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else [])
@@ -558,12 +564,16 @@ def create_scene(args: argparse.Namespace) -> bpy.types.Object:
     preset = dict(PRESETS[args.quality])
     if args.frame_end is not None:
         preset["frame_end"] = args.frame_end
+    if args.playback_end is not None:
+        preset["playback_end"] = min(args.playback_end, preset["frame_end"])
+    else:
+        preset["playback_end"] = preset["frame_end"]
     if args.fps is not None:
         preset["fps"] = args.fps
     clear_scene()
     scene = bpy.context.scene
     scene.frame_start = 1
-    scene.frame_end = preset["frame_end"]
+    scene.frame_end = preset["playback_end"]
     scene.render.fps = preset["fps"]
     scene.sync_mode = "FRAME_DROP"
     scene.render.resolution_x = 1280
@@ -611,6 +621,7 @@ def main() -> None:
     bpy.ops.wm.save_as_mainfile(filepath=str(args.output.resolve()))
     if args.bake:
         bake(domain)
+        bpy.context.scene.frame_end = min(args.playback_end or bpy.context.scene.frame_end, bpy.context.scene.frame_end)
         bpy.context.scene.frame_set(min(45, bpy.context.scene.frame_end))
         bpy.ops.wm.save_as_mainfile(filepath=str(args.output.resolve()))
     print(f"Saved Mantaflow wave tank: {args.output}")

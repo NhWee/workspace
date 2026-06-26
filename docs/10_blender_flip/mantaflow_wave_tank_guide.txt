@@ -60,14 +60,28 @@ For long runs, the paddle force tapers after the early frames and the absorbing
 beach is lower so the water is less likely to climb into a tall wall late in
 the simulation.
 
+Create and bake a long cache with a stable playback range
+---------------------------------------------------------
+
+  .\tools\blender-5.1.2\blender-5.1.2-windows-x64\blender.exe --background --python wave_sim\blender_fluid\create_mantaflow_wave_tank.py -- --quality ocean_preview --output outputs\mantaflow_wave_tank_vortex_flow_viewable_long.blend --cache-dir outputs\mantaflow_wave_tank_vortex_flow_viewable_long_cache --frame-end 180 --playback-end 75 --fps 15 --bake
+
+This still simulates a longer 180-frame cache, but the visible Blender timeline
+ends at frame 75. In the current closed wave tank, frames after roughly 75-90
+can become unstable because fluid reflects from the right boundary, piles up
+near the beach/wall region, and can separate into unrealistic floating sheets.
+The shorter playback range keeps the file on the stable, useful part of the
+bake while preserving the option to inspect later cached frames manually.
+
 Optional overrides:
 
   --frame-end 480
+  --playback-end 120
   --fps 60
 
 Higher fps makes the same baked frames play faster in Blender. Higher
 frame-end makes the simulation longer, but also increases bake time and cache
-size.
+size. playback-end only changes the visible timeline; it does not reduce the
+number of simulated cache frames.
 
 What is now considered
 ----------------------
@@ -97,6 +111,9 @@ The improved scene now considers:
 14. long-run stability: the paddle force now tapers after the first part of the
     run, the submerged deflectors are weaker, and the absorbing beach is lower
     to reduce late-frame energy buildup.
+15. playback trimming: a long cache can be baked while Blender opens on a
+    shorter stable timeline, avoiding late-frame boundary artifacts during
+    normal playback.
 
 Still to improve
 ----------------
@@ -116,6 +133,9 @@ The next realism gaps are:
    velocity field or higher-resolution FLIP setup. The current version keeps
    the liquid stable, adds asymmetric flow forcing, and shows the rotating
    region through foam placement.
+6. Long open-ocean behavior needs a better outlet/sponge boundary or a larger
+   domain. Playback trimming hides the broken late section, but it does not
+   solve the underlying closed-tank accumulation.
 
 Create and bake the production scene
 ------------------------------------
