@@ -1,0 +1,127 @@
+3D finite-wing LBM flow experiment guide
+========================================
+
+File
+----
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\wave_sim\navier_stokes\airfoil_lbm_3d.py
+
+What this makes
+---------------
+This is the first Blender-free 3D airplane-wing flow prototype in the project.
+PyTorch computes a 3D D3Q19 Lattice Boltzmann Method flow, and Plotly writes an
+interactive 3D HTML viewer.
+
+The output shows:
+
+1. a finite 3D wing obstacle
+2. passive tracer particles moving through the computed velocity field
+3. particle color based on local vorticity magnitude
+4. an animated 3D view that can be rotated and zoomed in the browser
+
+Method
+------
+The solver uses a D3Q19 Lattice Boltzmann Method:
+
+1. store 19 distribution functions per 3D grid cell
+2. compute density and velocity from those distributions
+3. relax distributions toward equilibrium using tau
+4. stream distributions to neighboring cells
+5. apply bounce-back on the finite wing obstacle
+6. apply inlet, outlet, and side open-ish boundaries
+7. advect passive particles through the velocity field
+8. color particles by local vorticity magnitude
+
+Why this does not need Blender
+------------------------------
+Blender is only a renderer/simulator option. This file does both the simulation
+and the visualization from Python:
+
+PyTorch GPU calculation -> Plotly 3D HTML output
+
+That means it is easier to iterate on the numerical method without baking
+Blender caches.
+
+Useful parameters
+-----------------
+--size-x, --size-y, --size-z
+3D grid size. Higher values are smoother but cost much more memory and compute.
+
+--steps
+Number of LBM time steps.
+
+--frame-every
+Saves one viewer frame every N steps.
+
+--tau
+LBM relaxation time. Must be greater than 0.5. Lower values can preserve
+sharper vortices but may become unstable.
+
+--inlet-velocity
+Lattice-unit inlet speed. Keep this modest, usually around 0.035 to 0.065 for
+the current prototype.
+
+--angle-of-attack
+Wing angle of attack in degrees.
+
+--chord
+Wing chord as a fraction of domain length.
+
+--span
+Wing span as a fraction of domain width.
+
+--thickness
+NACA-like relative thickness used for the finite wing obstacle.
+
+--particles
+Number of passive tracer particles.
+
+--particle-step-scale
+Visual particle advection speed multiplier. It changes how fast tracer markers
+move through the viewer, not the LBM solver itself.
+
+Example
+-------
+From the project root:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_lbm_3d
+
+Heavier run:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_lbm_3d --size-x 110 --size-y 56 --size-z 38 --steps 800 --frame-every 12 --particles 900
+
+More aggressive angle:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_lbm_3d --angle-of-attack 14 --inlet-velocity 0.055 --tau 0.58
+
+Output
+------
+By default, the HTML viewer is written to:
+
+outputs\airfoil_lbm_3d.html
+
+How to read it
+--------------
+Open the HTML and look at the moving particles. They start from the inlet,
+pass around the finite wing, and continue into the wake. Warmer particle colors
+mean stronger local vorticity. Near the wing tips, the particle colors and
+paths should begin to show the 3D nature of the flow.
+
+Current limitations
+-------------------
+This is still a prototype. It is not yet validated CFD.
+
+The main limitations are:
+
+1. the finite wing shape is simplified
+2. boundaries are practical open-ish approximations
+3. particles show flow paths but are not real smoke
+4. force coefficients are not computed yet
+5. turbulence modeling and high-Reynolds behavior are not included
+
+Good next steps are:
+
+1. improve wing geometry and make NACA section selectable
+2. add force estimation with 3D momentum exchange
+3. add vortex-core extraction or more explicit wingtip vortex markers
+4. export smaller NPZ datasets for reusable visualization
+5. build a Three.js viewer if Plotly becomes too limiting
