@@ -23,7 +23,9 @@ The output HTML has four panels:
 
 4. inlet tracer
    Shows passive dye injected from the inlet. This makes it much easier to see
-   whether the air flows around the airfoil and how the wake develops.
+   whether the air flows around the airfoil and how the wake develops. White
+   particles are passive pathline markers carried by the computed velocity
+   field.
 
 Method
 ------
@@ -36,6 +38,10 @@ The solver uses the D2Q9 Lattice Boltzmann Method:
 5. apply bounce-back on the NACA airfoil obstacle
 6. apply inlet, outlet, and top/bottom open-ish boundaries
 7. visualize vorticity, speed, pressure, and tracer dye
+8. advect passive particles through the velocity field so pathlines are easier
+   to read
+9. estimate qualitative lift/drag using a momentum-exchange-style force at the
+   bounce-back obstacle cells
 
 Why this is better than the previous airfoil_flow_2d.py
 ------------------------------------------------------
@@ -79,6 +85,11 @@ NACA 4-digit airfoil name, such as NACA0012 or NACA2412.
 --tracer-decay
 How quickly inlet dye fades.
 
+--particles
+Number of passive pathline particles drawn over the tracer panel. These do not
+affect the simulation; they only make the computed flow direction easier to
+see.
+
 Example
 -------
 From the project root:
@@ -101,13 +112,15 @@ outputs\airfoil_lbm_2d.html
 
 Current limitations
 -------------------
-This is still a 2D qualitative solver. It does not yet provide validated lift
-and drag, wall shear stress, turbulence modeling, or 3D wingtip vortices.
+This is still a 2D qualitative solver. The force estimate is now closer to the
+LBM method because it uses momentum exchange near bounce-back cells, but it is
+still not validated against a real airfoil benchmark. It also does not yet
+provide wall shear stress, turbulence modeling, or 3D wingtip vortices.
 
 Good next steps are:
 
 1. compare NACA0012 and NACA2412 at several angles of attack
-2. add particle pathlines over the tracer field
-3. estimate force with a more careful momentum-exchange method
+2. compare pathline behavior under different angles of attack
+3. validate the momentum-exchange force against a simple benchmark
 4. add Reynolds-like presets based on tau, velocity, and chord
 5. later expand to a 3D finite-wing wake visualization

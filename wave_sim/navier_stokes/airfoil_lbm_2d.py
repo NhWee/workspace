@@ -4,7 +4,7 @@
 # boundary handling around a NACA 4-digit airfoil obstacle.
 # You can handle the parameters
 # size_x, size_y, steps, frame_every, tau, inlet_velocity, angle_of_attack,
-# chord, naca, tracer_decay, output
+# chord, naca, tracer_decay, particles, output
 import argparse
 import sys
 from pathlib import Path
@@ -150,21 +150,66 @@ def advect_tracer(tracer: torch.Tensor, ux: torch.Tensor, uy: torch.Tensor, obst
     return torch.where(obstacle, torch.zeros_like(sampled), torch.clamp(sampled * decay, 0.0, 1.0))
 
 
-def estimate_force(rho: torch.Tensor, obstacle: torch.Tensor, inlet_velocity: float, chord: float) -> tuple[float, float]:
-    pressure = (rho - 1.0) / 3.0
-    fluid = ~obstacle
-    left = obstacle & torch.roll(fluid, shifts=1, dims=1)
-    right = obstacle & torch.roll(fluid, shifts=-1, dims=1)
-    bottom = obstacle & torch.roll(fluid, shifts=1, dims=0)
-    top = obstacle & torch.roll(fluid, shifts=-1, dims=0)
-    drag = torch.sum(torch.where(left, torch.roll(pressure, shifts=1, dims=1), 0.0)) - torch.sum(
-        torch.where(right, torch.roll(pressure, shifts=-1, dims=1), 0.0)
-    )
-    lift = torch.sum(torch.where(bottom, torch.roll(pressure, shifts=1, dims=0), 0.0)) - torch.sum(
-        torch.where(top, torch.roll(pressure, shifts=-1, dims=0), 0.0)
-    )
+def sample_field(field: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    grid = torch.stack((2.0 * x - 1.0, 2.0 * y - 1.0), dim=-1)[None, None, :, :]
+    return F.grid_sample(
+        field[None, None, :, :],
+        grid,
+        mode="bilinear",
+        padding_mode="border",
+        align_corners=True,
+    )[0, 0, 0]
+
+
+def make_particles(count: int, device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
+    if count <= 0:
+        return torch.empty(0, device=device), torch.empty(0, device=device)
+    y = torch.linspace(0.08, 0.92, count, device=device)
+    x = torch.full_like(y, 0.025)
+    return x, y
+
+
+def advance_particles(
+    particle_x: torch.Tensor,
+    particle_y: torch.Tensor,
+    ux: torch.Tensor,
+    uy: torch.Tensor,
+    obstacle: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if particle_x.numel() == 0:
+        return particle_x, particle_y
+
+    sampled_u = sample_field(ux, particle_x, particle_y)
+    sampled_v = sample_field(uy, particle_x, particle_y)
+    height, width = ux.shape
+    particle_x = particle_x + sampled_u / max(width - 1, 1)
+    particle_y = particle_y + sampled_v / max(height - 1, 1)
+
+    obstacle_hit = sample_field(obstacle.to(torch.float32), particle_x, particle_y) > 0.15
+    out = (particle_x > 0.99) | (particle_x < 0.0) | (particle_y < 0.02) | (particle_y > 0.98) | obstacle_hit
+    if torch.any(out):
+        count = int(torch.sum(out).item())
+        particle_x[out] = 0.025
+        particle_y[out] = torch.linspace(0.08, 0.92, count, device=particle_x.device)
+    return particle_x, particle_y
+
+
+def estimate_momentum_exchange_force(
+    collided: torch.Tensor,
+    obstacle: torch.Tensor,
+    c: torch.Tensor,
+    opp: torch.Tensor,
+    inlet_velocity: float,
+    chord: float,
+) -> tuple[float, float]:
+    force_x = torch.zeros((), device=collided.device)
+    force_y = torch.zeros((), device=collided.device)
+    for i in range(1, 9):
+        incoming = collided[int(opp[i].item()), obstacle]
+        force_x = force_x + torch.sum(2.0 * c[i, 0] * incoming)
+        force_y = force_y + torch.sum(2.0 * c[i, 1] * incoming)
     scale = 0.5 * max(inlet_velocity * inlet_velocity, 1.0e-6) * max(chord, 1.0e-6) * 100.0
-    return float(lift.detach().cpu() / scale), float(drag.detach().cpu() / scale)
+    return float(force_y.detach().cpu() / scale), float(force_x.detach().cpu() / scale)
 
 
 def simulate(
@@ -178,8 +223,9 @@ def simulate(
     chord: float,
     naca: str,
     tracer_decay: float,
+    particles: int,
     device: torch.device,
-) -> tuple[list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]], np.ndarray, list[tuple[float, float]]]:
+) -> tuple[list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]], np.ndarray, list[tuple[float, float]]]:
     c = C.to(device)
     c_int = C.to(torch.int64).to(device)
     w = W.to(device)
@@ -193,9 +239,11 @@ def simulate(
     ux = torch.where(obstacle, torch.zeros_like(ux), ux)
     f = equilibrium(rho, ux, uy, c, w)
     tracer = torch.zeros_like(rho)
+    particle_x, particle_y = make_particles(particles, device)
     omega = 1.0 / tau
     frames = []
     force_history = []
+    current_force = (0.0, 0.0)
 
     for step in range(steps):
         rho, ux, uy = macroscopic(f, c, obstacle)
@@ -206,10 +254,12 @@ def simulate(
         bounced = streamed.clone()
         for i in range(9):
             bounced[i, obstacle] = collided[int(opp[i].item()), obstacle]
+        current_force = estimate_momentum_exchange_force(collided, obstacle, c, opp, inlet_velocity, chord)
         f = impose_open_boundaries(bounced, inlet_velocity, c, w)
 
         rho, ux, uy = macroscopic(f, c, obstacle)
         tracer = advect_tracer(tracer, ux, uy, obstacle, tracer_decay)
+        particle_x, particle_y = advance_particles(particle_x, particle_y, ux, uy, obstacle)
 
         if step % frame_every == 0:
             vort = torch.where(obstacle, torch.zeros_like(rho), curl_z(ux, uy))
@@ -221,9 +271,11 @@ def simulate(
                     speed.detach().cpu().numpy().astype(np.float32),
                     pressure.detach().cpu().numpy().astype(np.float32),
                     tracer.detach().cpu().numpy().astype(np.float32),
+                    (particle_x * (size_x - 1)).detach().cpu().numpy().astype(np.float32),
+                    (particle_y * (size_y - 1)).detach().cpu().numpy().astype(np.float32),
                 )
             )
-            force_history.append(estimate_force(rho, obstacle, inlet_velocity, chord))
+            force_history.append(current_force)
 
     return frames, obstacle.detach().cpu().numpy(), force_history
 
@@ -243,18 +295,18 @@ def overlay_airfoil(fig: go.Figure, obstacle: np.ndarray, row: int, col: int) ->
 
 
 def build_figure(
-    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
     obstacle: np.ndarray,
     force_history: list[tuple[float, float]],
     frame_duration_ms: int,
     title: str,
 ) -> go.Figure:
-    first_vort, first_speed, first_pressure, first_tracer = frames[0]
+    first_vort, first_speed, first_pressure, first_tracer, first_particle_x, first_particle_y = frames[0]
     lift = np.array([x for x, _ in force_history], dtype=np.float32)
     drag = np.array([x for _, x in force_history], dtype=np.float32)
-    vort_limit = max(1.0e-6, max(float(np.percentile(np.abs(v), 99.2)) for v, _, _, _ in frames))
-    speed_limit = max(1.0e-6, max(float(np.percentile(s, 99.5)) for _, s, _, _ in frames))
-    pressure_limit = max(1.0e-6, max(float(np.percentile(np.abs(p), 99.2)) for _, _, p, _ in frames))
+    vort_limit = max(1.0e-6, max(float(np.percentile(np.abs(v), 99.2)) for v, _, _, _, _, _ in frames))
+    speed_limit = max(1.0e-6, max(float(np.percentile(s, 99.5)) for _, s, _, _, _, _ in frames))
+    pressure_limit = max(1.0e-6, max(float(np.percentile(np.abs(p), 99.2)) for _, _, p, _, _, _ in frames))
 
     fig = make_subplots(
         rows=2,
@@ -272,6 +324,18 @@ def build_figure(
     for trace, row, col in base_traces:
         fig.add_trace(trace, row=row, col=col)
         overlay_airfoil(fig, obstacle, row, col)
+    fig.add_trace(
+        go.Scatter(
+            x=first_particle_x,
+            y=first_particle_y,
+            mode="markers",
+            marker={"size": 3, "color": "#f8fafc", "opacity": 0.74},
+            showlegend=False,
+            hoverinfo="skip",
+        ),
+        row=2,
+        col=2,
+    )
 
     obstacle_z = np.where(obstacle, 1.0, np.nan)
     fig.frames = [
@@ -285,11 +349,19 @@ def build_figure(
                 go.Heatmap(z=obstacle_z, colorscale=[[0.0, "#0f172a"], [1.0, "#0f172a"]], showscale=False),
                 go.Heatmap(z=tracer, colorscale="Viridis", zmin=0.0, zmax=1.0),
                 go.Heatmap(z=obstacle_z, colorscale=[[0.0, "#0f172a"], [1.0, "#0f172a"]], showscale=False),
+                go.Scatter(
+                    x=particle_x,
+                    y=particle_y,
+                    mode="markers",
+                    marker={"size": 3, "color": "#f8fafc", "opacity": 0.74},
+                    showlegend=False,
+                    hoverinfo="skip",
+                ),
             ],
             name=str(index),
             layout=go.Layout(title_text=f"{title} | CL~{lift[index]:+.3f}, CD~{drag[index]:+.3f}"),
         )
-        for index, (vort, speed, pressure, tracer) in enumerate(frames)
+        for index, (vort, speed, pressure, tracer, particle_x, particle_y) in enumerate(frames)
     ]
 
     fig.update_xaxes(visible=False, constrain="domain")
@@ -346,6 +418,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chord", type=float, default=0.30, help="Airfoil chord as a fraction of domain width.")
     parser.add_argument("--naca", type=str, default="NACA2412", help="NACA 4-digit airfoil.")
     parser.add_argument("--tracer-decay", type=float, default=0.996, help="Passive tracer decay per step.")
+    parser.add_argument("--particles", type=int, default=280, help="Number of passive pathline particles.")
     parser.add_argument("--frame-duration-ms", type=int, default=38, help="Animation frame duration in milliseconds.")
     parser.add_argument("--output", type=Path, default=Path("outputs/airfoil_lbm_2d.html"), help="Output HTML path.")
     return parser.parse_args()
@@ -371,6 +444,7 @@ def main() -> None:
         chord=args.chord,
         naca=args.naca,
         tracer_decay=args.tracer_decay,
+        particles=args.particles,
         device=device,
     )
     fig = build_figure(
