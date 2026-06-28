@@ -331,6 +331,31 @@ def trails_to_plot_arrays(
     return np.array(line_x, dtype=np.float32), np.array(line_y, dtype=np.float32), np.array(line_z, dtype=np.float32)
 
 
+def wingtip_vortex_markers(
+    particle_x: np.ndarray,
+    particle_y: np.ndarray,
+    particle_z: np.ndarray,
+    particle_vort: np.ndarray,
+    wing_y: np.ndarray,
+    size_x: int,
+    size_y: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    if particle_x.size == 0:
+        empty = np.array([], dtype=np.float32)
+        return empty, empty, empty, empty
+
+    left_tip = float(np.min(wing_y))
+    right_tip = float(np.max(wing_y))
+    tip_band = max(2.5, size_y * 0.11)
+    wake_start = size_x * 0.32
+    vort_threshold = max(float(np.percentile(particle_vort, 70.0)), 1.0e-8)
+    near_tip = (np.abs(particle_y - left_tip) < tip_band) | (np.abs(particle_y - right_tip) < tip_band)
+    in_wake = particle_x > wake_start
+    strong = particle_vort >= vort_threshold
+    mask = near_tip & in_wake & strong
+    return particle_x[mask], particle_y[mask], particle_z[mask], particle_vort[mask]
+
+
 def boundary_points(obstacle: torch.Tensor, max_points: int) -> np.ndarray:
     exposed = obstacle & (
         ~torch.roll(obstacle, shifts=1, dims=0)
@@ -434,6 +459,15 @@ def build_figure(
     first_x, first_y, first_z, first_vort, first_line_x, first_line_y, first_line_z = frames[0]
     vort_limit = max(1.0e-6, max(float(np.percentile(vort, 98.0)) for _x, _y, _z, vort, _lx, _ly, _lz in frames))
     wing_x, wing_y, wing_z, wing_i, wing_j, wing_k = wing_mesh
+    first_tip_x, first_tip_y, first_tip_z, first_tip_vort = wingtip_vortex_markers(
+        first_x,
+        first_y,
+        first_z,
+        first_vort,
+        wing_y,
+        size_x,
+        size_y,
+    )
 
     fig = go.Figure()
     fig.add_trace(
@@ -481,30 +515,65 @@ def build_figure(
             hoverinfo="skip",
         )
     )
-    fig.frames = [
-        go.Frame(
-            data=[
-                go.Mesh3d(x=wing_x, y=wing_y, z=wing_z, i=wing_i, j=wing_j, k=wing_k, color="#9ca3af", opacity=0.78, flatshading=False),
-                go.Scatter3d(
-                    x=line_x,
-                    y=line_y,
-                    z=line_z,
-                    mode="lines",
-                    line={"width": 3.0, "color": "rgba(191, 219, 254, 0.42)"},
-                ),
-                go.Scatter3d(
-                    x=x,
-                    y=y,
-                    z=z,
-                    mode="markers",
-                    marker={"size": 2.6, "color": vort, "colorscale": "Turbo", "cmin": 0.0, "cmax": vort_limit, "opacity": 0.92},
-                ),
-            ],
-            name=str(index),
-            layout=go.Layout(title_text=f"{title} | max vorticity {vort_history[index]:.4f}"),
+    fig.add_trace(
+        go.Scatter3d(
+            x=first_tip_x,
+            y=first_tip_y,
+            z=first_tip_z,
+            mode="markers",
+            marker={
+                "size": 5.2,
+                "color": first_tip_vort,
+                "colorscale": [[0.0, "#fde047"], [0.55, "#fb923c"], [1.0, "#ef4444"]],
+                "cmin": 0.0,
+                "cmax": vort_limit,
+                "opacity": 0.95,
+            },
+            name="wingtip vortex",
+            hoverinfo="skip",
         )
-        for index, (x, y, z, vort, line_x, line_y, line_z) in enumerate(frames)
-    ]
+    )
+    plotly_frames = []
+    for index, (x, y, z, vort, line_x, line_y, line_z) in enumerate(frames):
+        tip_x, tip_y, tip_z, tip_vort = wingtip_vortex_markers(x, y, z, vort, wing_y, size_x, size_y)
+        plotly_frames.append(
+            go.Frame(
+                data=[
+                    go.Mesh3d(x=wing_x, y=wing_y, z=wing_z, i=wing_i, j=wing_j, k=wing_k, color="#9ca3af", opacity=0.78, flatshading=False),
+                    go.Scatter3d(
+                        x=line_x,
+                        y=line_y,
+                        z=line_z,
+                        mode="lines",
+                        line={"width": 3.0, "color": "rgba(191, 219, 254, 0.42)"},
+                    ),
+                    go.Scatter3d(
+                        x=x,
+                        y=y,
+                        z=z,
+                        mode="markers",
+                        marker={"size": 2.6, "color": vort, "colorscale": "Turbo", "cmin": 0.0, "cmax": vort_limit, "opacity": 0.92},
+                    ),
+                    go.Scatter3d(
+                        x=tip_x,
+                        y=tip_y,
+                        z=tip_z,
+                        mode="markers",
+                        marker={
+                            "size": 5.2,
+                            "color": tip_vort,
+                            "colorscale": [[0.0, "#fde047"], [0.55, "#fb923c"], [1.0, "#ef4444"]],
+                            "cmin": 0.0,
+                            "cmax": vort_limit,
+                            "opacity": 0.95,
+                        },
+                    ),
+                ],
+                name=str(index),
+                layout=go.Layout(title_text=f"{title} | max vorticity {vort_history[index]:.4f}"),
+            )
+        )
+    fig.frames = plotly_frames
     fig.update_layout(
         title=f"{title} | frames {len(frames)}",
         width=1120,

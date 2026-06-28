@@ -16,7 +16,8 @@ The output shows:
 1. a smooth finite-wing surface mesh
 2. passive pathline curves moving through the computed velocity field
 3. particle heads colored by local vorticity magnitude
-4. an animated 3D view that can be rotated and zoomed in the browser
+4. highlighted wingtip-vortex markers near the two wing tips
+5. an animated 3D view that can be rotated and zoomed in the browser
 
 Method
 ------
@@ -31,6 +32,7 @@ The solver uses a D3Q19 Lattice Boltzmann Method:
 7. advect passive particles through the velocity field
 8. keep recent particle positions as pathline curves
 9. color particle heads by local vorticity magnitude
+10. highlight high-vorticity particles near the finite-wing tips
 
 Why this does not need Blender
 ------------------------------
@@ -109,8 +111,9 @@ How to read it
 Open the HTML and look at the moving particles. They start from the inlet,
 pass around the smooth finite wing, and continue into the wake. The pale curves
 are recent particle histories, so they read more like wind-tunnel streamlines.
-Warmer particle colors mean stronger local vorticity. Near the wing tips, the
-particle colors and paths should begin to show the 3D nature of the flow.
+Warmer particle colors mean stronger local vorticity. The larger yellow-orange
+markers appear where high-vorticity particles pass close to the left or right
+wing tip, making the wingtip-vortex region easier to find.
 
 Current limitations
 -------------------
@@ -129,6 +132,6 @@ Good next steps are:
 
 1. improve wing geometry and make NACA section selectable
 2. add force estimation with 3D momentum exchange
-3. add vortex-core extraction or more explicit wingtip vortex markers
+3. replace the current particle-based wingtip markers with vortex-core curves
 4. export smaller NPZ datasets for reusable visualization
 5. build a Three.js viewer if Plotly becomes too limiting
