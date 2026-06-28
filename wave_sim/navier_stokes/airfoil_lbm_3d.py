@@ -1,9 +1,9 @@
 # 3D finite-wing flow using a D3Q19 Lattice Boltzmann Method solver with PyTorch GPU acceleration.
 # This runs without Blender: PyTorch computes the flow and Plotly writes an
-# interactive 3D HTML viewer with wing geometry and passive tracer particles.
+# interactive 3D HTML viewer with a smooth wing mesh and passive pathline curves.
 # You can handle the parameters
 # size_x, size_y, size_z, steps, frame_every, tau, inlet_velocity,
-# angle_of_attack, chord, span, thickness, particles, output
+# angle_of_attack, chord, span, thickness, particles, trail_length, output
 import argparse
 import sys
 from pathlib import Path
@@ -84,6 +84,70 @@ def finite_wing_mask(
     inside_chord = (x_local >= 0.0) & (x_local <= 1.0)
     inside_thickness = torch.abs(z_local) <= naca_like_thickness * taper
     return inside_chord & rounded_tip & inside_thickness
+
+
+def make_wing_mesh(
+    size_x: int,
+    size_y: int,
+    size_z: int,
+    chord: float,
+    span: float,
+    thickness: float,
+    angle_deg: float,
+    chord_segments: int = 46,
+    span_segments: int = 24,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    center_x = 0.34
+    center_y = 0.50
+    center_z = 0.50
+    angle = np.deg2rad(angle_deg)
+    x = np.linspace(0.0, 1.0, chord_segments)
+    y_local = np.linspace(-0.5, 0.5, span_segments)
+    xx, yy = np.meshgrid(x, y_local, indexing="xy")
+    taper = np.clip(1.0 - 0.72 * np.abs(yy) ** 2.0, 0.28, None)
+    yt = 5.0 * thickness * (
+        0.2969 * np.sqrt(np.clip(xx, 1.0e-6, None))
+        - 0.1260 * xx
+        - 0.3516 * xx**2
+        + 0.2843 * xx**3
+        - 0.1015 * xx**4
+    ) * taper
+
+    vertices = []
+    for sign in (1.0, -1.0):
+        x_world = center_x + chord * xx * np.cos(angle) - sign * chord * yt * np.sin(angle)
+        z_world = center_z + chord * xx * np.sin(angle) + sign * chord * yt * np.cos(angle)
+        y_world = center_y + span * yy
+        vertices.append(np.column_stack((
+            (x_world.reshape(-1) * (size_x - 1)),
+            (y_world.reshape(-1) * (size_y - 1)),
+            (z_world.reshape(-1) * (size_z - 1)),
+        )))
+    vertices_np = np.vstack(vertices)
+
+    faces_i = []
+    faces_j = []
+    faces_k = []
+    sheet_size = chord_segments * span_segments
+    for sheet in range(2):
+        offset = sheet * sheet_size
+        for row in range(span_segments - 1):
+            for col in range(chord_segments - 1):
+                a = offset + row * chord_segments + col
+                b = a + 1
+                c = a + chord_segments
+                d = c + 1
+                faces_i.extend([a, b])
+                faces_j.extend([b, d])
+                faces_k.extend([c, c])
+    return (
+        vertices_np[:, 0],
+        vertices_np[:, 1],
+        vertices_np[:, 2],
+        np.array(faces_i, dtype=np.int32),
+        np.array(faces_j, dtype=np.int32),
+        np.array(faces_k, dtype=np.int32),
+    )
 
 
 def equilibrium(rho: torch.Tensor, ux: torch.Tensor, uy: torch.Tensor, uz: torch.Tensor, c: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
@@ -205,6 +269,68 @@ def advance_particles(
     return px, py, pz
 
 
+def make_trails(
+    px: torch.Tensor,
+    py: torch.Tensor,
+    pz: torch.Tensor,
+    trail_length: int,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    if trail_length <= 1 or px.numel() == 0:
+        empty = torch.empty((0, px.numel()), device=px.device)
+        return empty, empty, empty
+    return (
+        px.repeat(trail_length, 1),
+        py.repeat(trail_length, 1),
+        pz.repeat(trail_length, 1),
+    )
+
+
+def update_trails(
+    trail_x: torch.Tensor,
+    trail_y: torch.Tensor,
+    trail_z: torch.Tensor,
+    px: torch.Tensor,
+    py: torch.Tensor,
+    pz: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    if trail_x.numel() == 0:
+        return trail_x, trail_y, trail_z
+    trail_x = torch.roll(trail_x, shifts=-1, dims=0)
+    trail_y = torch.roll(trail_y, shifts=-1, dims=0)
+    trail_z = torch.roll(trail_z, shifts=-1, dims=0)
+    trail_x[-1] = px
+    trail_y[-1] = py
+    trail_z[-1] = pz
+    return trail_x, trail_y, trail_z
+
+
+def trails_to_plot_arrays(
+    trail_x: np.ndarray,
+    trail_y: np.ndarray,
+    trail_z: np.ndarray,
+    max_lines: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    if trail_x.size == 0:
+        return np.array([], dtype=np.float32), np.array([], dtype=np.float32), np.array([], dtype=np.float32)
+    particle_count = trail_x.shape[1]
+    if particle_count > max_lines:
+        indices = np.linspace(0, particle_count - 1, max_lines).astype(np.int64)
+        trail_x = trail_x[:, indices]
+        trail_y = trail_y[:, indices]
+        trail_z = trail_z[:, indices]
+    line_x = []
+    line_y = []
+    line_z = []
+    for index in range(trail_x.shape[1]):
+        line_x.extend(trail_x[:, index].tolist())
+        line_y.extend(trail_y[:, index].tolist())
+        line_z.extend(trail_z[:, index].tolist())
+        line_x.append(np.nan)
+        line_y.append(np.nan)
+        line_z.append(np.nan)
+    return np.array(line_x, dtype=np.float32), np.array(line_y, dtype=np.float32), np.array(line_z, dtype=np.float32)
+
+
 def boundary_points(obstacle: torch.Tensor, max_points: int) -> np.ndarray:
     exposed = obstacle & (
         ~torch.roll(obstacle, shifts=1, dims=0)
@@ -235,8 +361,9 @@ def simulate(
     thickness: float,
     particles: int,
     particle_step_scale: float,
+    trail_length: int,
     device: torch.device,
-) -> tuple[list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]], np.ndarray, list[float]]:
+) -> tuple[list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]], tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray], list[float]]:
     c = C.to(device)
     c_int = C.to(torch.int64).to(device)
     w = W.to(device)
@@ -251,9 +378,11 @@ def simulate(
     ux = torch.where(obstacle, torch.zeros_like(ux), ux)
     f = equilibrium(rho, ux, uy, uz, c, w)
     px, py, pz = make_particles(particles, device)
+    trail_x, trail_y, trail_z = make_trails(px, py, pz, trail_length)
     omega = 1.0 / tau
     frames = []
     vort_history = []
+    wing_mesh = make_wing_mesh(size_x, size_y, size_z, chord, span, thickness, angle_of_attack)
 
     for step in range(steps):
         rho, ux, uy, uz = macroscopic(f, c, obstacle)
@@ -267,26 +396,34 @@ def simulate(
 
         rho, ux, uy, uz = macroscopic(f, c, obstacle)
         px, py, pz = advance_particles(px, py, pz, ux, uy, uz, obstacle, particle_step_scale)
+        trail_x, trail_y, trail_z = update_trails(trail_x, trail_y, trail_z, px, py, pz)
 
         if step % frame_every == 0:
             vort = torch.where(obstacle, torch.zeros_like(rho), curl_magnitude(ux, uy, uz))
             particle_vort = sample_field(vort, px, py, pz)
+            scaled_trail_x = (trail_x * (size_x - 1)).detach().cpu().numpy().astype(np.float32)
+            scaled_trail_y = (trail_y * (size_y - 1)).detach().cpu().numpy().astype(np.float32)
+            scaled_trail_z = (trail_z * (size_z - 1)).detach().cpu().numpy().astype(np.float32)
+            line_x, line_y, line_z = trails_to_plot_arrays(scaled_trail_x, scaled_trail_y, scaled_trail_z, max_lines=140)
             frames.append(
                 (
                     (px * (size_x - 1)).detach().cpu().numpy().astype(np.float32),
                     (py * (size_y - 1)).detach().cpu().numpy().astype(np.float32),
                     (pz * (size_z - 1)).detach().cpu().numpy().astype(np.float32),
                     particle_vort.detach().cpu().numpy().astype(np.float32),
+                    line_x,
+                    line_y,
+                    line_z,
                 )
             )
             vort_history.append(float(torch.max(vort).detach().cpu()))
 
-    return frames, boundary_points(obstacle, max_points=3500), vort_history
+    return frames, wing_mesh, vort_history
 
 
 def build_figure(
-    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
-    wing_points: np.ndarray,
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
+    wing_mesh: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     vort_history: list[float],
     size_x: int,
     size_y: int,
@@ -294,19 +431,34 @@ def build_figure(
     frame_duration_ms: int,
     title: str,
 ) -> go.Figure:
-    first_x, first_y, first_z, first_vort = frames[0]
-    vort_limit = max(1.0e-6, max(float(np.percentile(vort, 98.0)) for *_xyz, vort in frames))
-    wing_z, wing_y, wing_x = wing_points[:, 0], wing_points[:, 1], wing_points[:, 2]
+    first_x, first_y, first_z, first_vort, first_line_x, first_line_y, first_line_z = frames[0]
+    vort_limit = max(1.0e-6, max(float(np.percentile(vort, 98.0)) for _x, _y, _z, vort, _lx, _ly, _lz in frames))
+    wing_x, wing_y, wing_z, wing_i, wing_j, wing_k = wing_mesh
 
     fig = go.Figure()
     fig.add_trace(
-        go.Scatter3d(
+        go.Mesh3d(
             x=wing_x,
             y=wing_y,
             z=wing_z,
-            mode="markers",
-            marker={"size": 2.5, "color": "#1f2937", "opacity": 0.82},
+            i=wing_i,
+            j=wing_j,
+            k=wing_k,
+            color="#9ca3af",
+            opacity=0.78,
+            flatshading=False,
             name="finite wing",
+            hoverinfo="skip",
+        )
+    )
+    fig.add_trace(
+        go.Scatter3d(
+            x=first_line_x,
+            y=first_line_y,
+            z=first_line_z,
+            mode="lines",
+            line={"width": 3.0, "color": "rgba(191, 219, 254, 0.42)"},
+            name="pathlines",
             hoverinfo="skip",
         )
     )
@@ -317,34 +469,41 @@ def build_figure(
             z=first_z,
             mode="markers",
             marker={
-                "size": 3.0,
+                "size": 2.6,
                 "color": first_vort,
                 "colorscale": "Turbo",
                 "cmin": 0.0,
                 "cmax": vort_limit,
-                "opacity": 0.78,
+                "opacity": 0.92,
                 "colorbar": {"title": "vort"},
             },
-            name="flow particles",
+            name="particle heads",
             hoverinfo="skip",
         )
     )
     fig.frames = [
         go.Frame(
             data=[
-                go.Scatter3d(x=wing_x, y=wing_y, z=wing_z, mode="markers", marker={"size": 2.5, "color": "#1f2937", "opacity": 0.82}),
+                go.Mesh3d(x=wing_x, y=wing_y, z=wing_z, i=wing_i, j=wing_j, k=wing_k, color="#9ca3af", opacity=0.78, flatshading=False),
+                go.Scatter3d(
+                    x=line_x,
+                    y=line_y,
+                    z=line_z,
+                    mode="lines",
+                    line={"width": 3.0, "color": "rgba(191, 219, 254, 0.42)"},
+                ),
                 go.Scatter3d(
                     x=x,
                     y=y,
                     z=z,
                     mode="markers",
-                    marker={"size": 3.0, "color": vort, "colorscale": "Turbo", "cmin": 0.0, "cmax": vort_limit, "opacity": 0.78},
+                    marker={"size": 2.6, "color": vort, "colorscale": "Turbo", "cmin": 0.0, "cmax": vort_limit, "opacity": 0.92},
                 ),
             ],
             name=str(index),
             layout=go.Layout(title_text=f"{title} | max vorticity {vort_history[index]:.4f}"),
         )
-        for index, (x, y, z, vort) in enumerate(frames)
+        for index, (x, y, z, vort, line_x, line_y, line_z) in enumerate(frames)
     ]
     fig.update_layout(
         title=f"{title} | frames {len(frames)}",
@@ -409,6 +568,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--thickness", type=float, default=0.13, help="NACA-like relative thickness.")
     parser.add_argument("--particles", type=int, default=650, help="Passive tracer particles.")
     parser.add_argument("--particle-step-scale", type=float, default=4.0, help="Particle advection visual speed multiplier.")
+    parser.add_argument("--trail-length", type=int, default=18, help="Number of recent particle positions shown as pathline curves.")
     parser.add_argument("--frame-duration-ms", type=int, default=45, help="Animation frame duration in milliseconds.")
     parser.add_argument("--output", type=Path, default=Path("outputs/airfoil_lbm_3d.html"), help="Output Plotly HTML path.")
     return parser.parse_args()
@@ -423,7 +583,7 @@ def main() -> None:
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
 
-    frames, wing_points, vort_history = simulate(
+    frames, wing_mesh, vort_history = simulate(
         size_x=args.size_x,
         size_y=args.size_y,
         size_z=args.size_z,
@@ -437,11 +597,12 @@ def main() -> None:
         thickness=args.thickness,
         particles=args.particles,
         particle_step_scale=args.particle_step_scale,
+        trail_length=args.trail_length,
         device=device,
     )
     fig = build_figure(
         frames,
-        wing_points,
+        wing_mesh,
         vort_history,
         args.size_x,
         args.size_y,
