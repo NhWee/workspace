@@ -11,6 +11,16 @@ This script is the first airplane-wing style flow experiment in the project.
 It places a NACA 4-digit airfoil inside a 2D incompressible velocity field and
 pushes air from the left side of the domain.
 
+Important
+---------
+This file is now kept as an early educational Navier-Stokes-style prototype.
+For the clearer and more proper airfoil-flow baseline, use:
+
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\wave_sim\navier_stokes\airfoil_lbm_2d.py
+
+The LBM version handles the solid airfoil interaction with bounce-back and is
+easier to interpret visually.
+
 The output HTML has four panels:
 
 1. vorticity / wake

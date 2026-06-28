@@ -1,0 +1,113 @@
+2D airfoil LBM flow experiment guide
+====================================
+
+File
+----
+C:\Users\Administrator\Documents\Codex\2026-06-02\gpu\wave_sim\navier_stokes\airfoil_lbm_2d.py
+
+What this makes
+---------------
+This is the better airplane-wing flow experiment. It uses a D2Q9 Lattice
+Boltzmann Method solver instead of the earlier stable-fluids style demo.
+
+The output HTML has four panels:
+
+1. vorticity / wake
+   Shows rotating wake structures behind the airfoil.
+
+2. speed
+   Shows acceleration and slowdown around the airfoil.
+
+3. pressure
+   Shows the density-derived pressure-like field from the LBM state.
+
+4. inlet tracer
+   Shows passive dye injected from the inlet. This makes it much easier to see
+   whether the air flows around the airfoil and how the wake develops.
+
+Method
+------
+The solver uses the D2Q9 Lattice Boltzmann Method:
+
+1. store nine distribution functions per grid cell
+2. compute density and velocity from those distributions
+3. relax distributions toward equilibrium with relaxation time tau
+4. stream each distribution to a neighboring cell
+5. apply bounce-back on the NACA airfoil obstacle
+6. apply inlet, outlet, and top/bottom open-ish boundaries
+7. visualize vorticity, speed, pressure, and tracer dye
+
+Why this is better than the previous airfoil_flow_2d.py
+------------------------------------------------------
+The previous file is still useful as a simple Navier-Stokes-style educational
+demo, but it is hard to read and the obstacle boundary is crude.
+
+This LBM version is more appropriate for an airfoil first pass because the
+solid obstacle interaction is handled through bounce-back and the wake is
+clearer. It is still not a validated CFD tool, but it is the better baseline
+for development.
+
+Useful parameters
+-----------------
+--size-x, --size-y
+Grid resolution. Higher values give smoother wake structures but cost more GPU
+time and create larger HTML files.
+
+--steps
+Number of LBM time steps.
+
+--frame-every
+Saves one animation frame every N steps.
+
+--tau
+LBM relaxation time. It must be greater than 0.5. Lower values usually preserve
+sharper vortices but can become unstable. Higher values are more diffusive.
+
+--inlet-velocity
+Lattice-unit inlet speed. Keep this modest. Around 0.04 to 0.08 is a good first
+range.
+
+--angle-of-attack
+Airfoil angle in degrees.
+
+--chord
+Airfoil chord as a fraction of the domain width.
+
+--naca
+NACA 4-digit airfoil name, such as NACA0012 or NACA2412.
+
+--tracer-decay
+How quickly inlet dye fades.
+
+Example
+-------
+From the project root:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_lbm_2d
+
+More obvious wake:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_lbm_2d --angle-of-attack 12 --inlet-velocity 0.065 --tau 0.56 --steps 1200
+
+Smoother/heavier run:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_lbm_2d --size-x 320 --size-y 160 --steps 1500 --frame-every 10 --tau 0.57
+
+Output
+------
+By default, the HTML viewer is written to:
+
+outputs\airfoil_lbm_2d.html
+
+Current limitations
+-------------------
+This is still a 2D qualitative solver. It does not yet provide validated lift
+and drag, wall shear stress, turbulence modeling, or 3D wingtip vortices.
+
+Good next steps are:
+
+1. compare NACA0012 and NACA2412 at several angles of attack
+2. add particle pathlines over the tracer field
+3. estimate force with a more careful momentum-exchange method
+4. add Reynolds-like presets based on tau, velocity, and chord
+5. later expand to a 3D finite-wing wake visualization
