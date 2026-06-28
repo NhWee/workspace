@@ -4,7 +4,7 @@
 # A NACA 4-digit airfoil is represented as a solid obstacle mask.
 # You can handle the parameters
 # size_x, size_y, steps, frame_every, dt, viscosity, pressure_iters,
-# inlet_velocity, angle_of_attack, chord, naca, output
+# inlet_velocity, angle_of_attack, chord, naca, tracer_decay, output
 import argparse
 import sys
 from pathlib import Path
@@ -178,6 +178,42 @@ def add_inlet_perturbation(
     return u, v
 
 
+def seed_tracer(
+    tracer: torch.Tensor,
+    yy: torch.Tensor,
+    inlet_velocity: float,
+    strength: float,
+) -> torch.Tensor:
+    stripe = 0.5 + 0.5 * torch.sin(2.0 * np.pi * yy * 8.0)
+    inlet = torch.zeros_like(tracer)
+    inlet[:, :4] = stripe[:, :4] * strength * max(inlet_velocity, 0.0)
+    return torch.maximum(tracer, torch.clamp(inlet, 0.0, 1.0))
+
+
+def estimate_pressure_force(
+    pressure: torch.Tensor,
+    obstacle: torch.Tensor,
+    inlet_velocity: float,
+    chord: float,
+) -> tuple[float, float]:
+    fluid = ~obstacle
+    left_fluid = obstacle & torch.roll(fluid, shifts=1, dims=1)
+    right_fluid = obstacle & torch.roll(fluid, shifts=-1, dims=1)
+    bottom_fluid = obstacle & torch.roll(fluid, shifts=1, dims=0)
+    top_fluid = obstacle & torch.roll(fluid, shifts=-1, dims=0)
+
+    p_left = torch.where(left_fluid, torch.roll(pressure, shifts=1, dims=1), torch.zeros_like(pressure))
+    p_right = torch.where(right_fluid, torch.roll(pressure, shifts=-1, dims=1), torch.zeros_like(pressure))
+    p_bottom = torch.where(bottom_fluid, torch.roll(pressure, shifts=1, dims=0), torch.zeros_like(pressure))
+    p_top = torch.where(top_fluid, torch.roll(pressure, shifts=-1, dims=0), torch.zeros_like(pressure))
+
+    drag = torch.sum(p_left - p_right)
+    lift = torch.sum(p_bottom - p_top)
+    dynamic_pressure = 0.5 * max(inlet_velocity * inlet_velocity, 1.0e-6)
+    scale = dynamic_pressure * max(chord, 1.0e-6) * 1000.0
+    return float(lift.detach().cpu() / scale), float(drag.detach().cpu() / scale)
+
+
 def simulate(
     size_x: int,
     size_y: int,
@@ -191,8 +227,9 @@ def simulate(
     chord: float,
     naca: str,
     perturbation: float,
+    tracer_decay: float,
     device: torch.device,
-) -> tuple[list[tuple[np.ndarray, np.ndarray, np.ndarray]], np.ndarray]:
+) -> tuple[list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]], np.ndarray, list[tuple[float, float]]]:
     dx = 1.0 / max(size_x, size_y)
     xx, yy = make_grid(size_x, size_y, device)
     obstacle = naca4_mask(xx, yy, naca, chord, center_x=0.38, center_y=0.52, angle_deg=angle_of_attack)
@@ -200,11 +237,16 @@ def simulate(
     v = torch.zeros_like(u)
     u, v = apply_boundaries(u, v, obstacle, inlet_velocity)
     pressure = torch.zeros_like(u)
+    tracer = torch.zeros_like(u)
     frames = []
+    force_history = []
 
     for step in range(steps):
         u = advect(u, u, v, dt, obstacle)
         v = advect(v, u, v, dt, obstacle)
+        tracer = advect(tracer, u, v, dt, obstacle)
+        tracer = torch.clamp(tracer * tracer_decay, 0.0, 1.0)
+        tracer = seed_tracer(tracer, yy, inlet_velocity, strength=3.0)
 
         u, v = add_inlet_perturbation(u, v, xx, yy, step, dt, inlet_velocity, perturbation)
 
@@ -219,43 +261,52 @@ def simulate(
             vort = torch.where(obstacle, torch.zeros_like(u), curl_z(u, v, dx))
             speed = torch.where(obstacle, torch.zeros_like(u), torch.sqrt(u * u + v * v))
             pressure_view = torch.where(obstacle, torch.zeros_like(pressure), pressure)
+            tracer_view = torch.where(obstacle, torch.zeros_like(tracer), tracer)
+            force_history.append(estimate_pressure_force(pressure, obstacle, inlet_velocity, chord))
             frames.append((
                 vort.detach().cpu().numpy().astype(np.float32),
                 speed.detach().cpu().numpy().astype(np.float32),
                 pressure_view.detach().cpu().numpy().astype(np.float32),
+                tracer_view.detach().cpu().numpy().astype(np.float32),
             ))
 
-    return frames, obstacle.detach().cpu().numpy()
+    return frames, obstacle.detach().cpu().numpy(), force_history
 
 
 def build_figure(
-    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray]],
+    frames: list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]],
     obstacle: np.ndarray,
+    force_history: list[tuple[float, float]],
     frame_duration_ms: int,
     title: str,
 ) -> go.Figure:
-    first_vort, first_speed, first_pressure = frames[0]
-    vort_limit = max(float(np.percentile(np.abs(vort), 99.4)) for vort, _, _ in frames)
-    speed_limit = max(float(np.percentile(speed, 99.5)) for _, speed, _ in frames)
-    pressure_limit = max(float(np.percentile(np.abs(pressure), 99.0)) for _, _, pressure in frames)
+    first_vort, first_speed, first_pressure, first_tracer = frames[0]
+    lift_history = np.array([lift for lift, _drag in force_history], dtype=np.float32)
+    drag_history = np.array([drag for _lift, drag in force_history], dtype=np.float32)
+    vort_limit = max(float(np.percentile(np.abs(vort), 99.4)) for vort, _, _, _ in frames)
+    speed_limit = max(float(np.percentile(speed, 99.5)) for _, speed, _, _ in frames)
+    pressure_limit = max(float(np.percentile(np.abs(pressure), 99.0)) for _, _, pressure, _ in frames)
     vort_limit = max(vort_limit, 1.0e-6)
     speed_limit = max(speed_limit, 1.0e-6)
     pressure_limit = max(pressure_limit, 1.0e-6)
 
     obstacle_z = np.where(obstacle, 1.0, np.nan)
     fig = make_subplots(
-        rows=1,
-        cols=3,
-        subplot_titles=("vorticity / wake", "speed field", "pressure-like field"),
-        horizontal_spacing=0.035,
+        rows=2,
+        cols=2,
+        subplot_titles=("vorticity / wake", "speed field", "pressure-like field", "passive tracer + lift/drag"),
+        horizontal_spacing=0.055,
+        vertical_spacing=0.095,
     )
     traces = [
         go.Heatmap(z=first_vort, colorscale="RdBu", zmin=-vort_limit, zmax=vort_limit, colorbar={"title": "curl"}),
         go.Heatmap(z=first_speed, colorscale="Turbo", zmin=0.0, zmax=speed_limit, colorbar={"title": "speed"}),
         go.Heatmap(z=first_pressure, colorscale="RdBu", zmin=-pressure_limit, zmax=pressure_limit, colorbar={"title": "p"}),
+        go.Heatmap(z=first_tracer, colorscale="Viridis", zmin=0.0, zmax=1.0, colorbar={"title": "tracer"}),
     ]
-    for col, trace in enumerate(traces, start=1):
-        fig.add_trace(trace, row=1, col=col)
+    positions = [(1, 1), (1, 2), (2, 1), (2, 2)]
+    for (row, col), trace in zip(positions, traces):
+        fig.add_trace(trace, row=row, col=col)
         fig.add_trace(
             go.Heatmap(
                 z=obstacle_z,
@@ -263,9 +314,22 @@ def build_figure(
                 showscale=False,
                 hoverinfo="skip",
             ),
-            row=1,
+            row=row,
             col=col,
         )
+    fig.add_trace(
+        go.Scatter(
+            x=[0],
+            y=[0],
+            mode="text",
+            text=[f"CL~{lift_history[0]:+.3f}<br>CD~{drag_history[0]:+.3f}"],
+            textfont={"color": "#f8fafc", "size": 14},
+            showlegend=False,
+            hoverinfo="skip",
+        ),
+        row=2,
+        col=2,
+    )
 
     fig.frames = [
         go.Frame(
@@ -276,18 +340,30 @@ def build_figure(
                 go.Heatmap(z=obstacle_z, colorscale=[[0.0, "#111827"], [1.0, "#111827"]], showscale=False),
                 go.Heatmap(z=pressure, colorscale="RdBu", zmin=-pressure_limit, zmax=pressure_limit),
                 go.Heatmap(z=obstacle_z, colorscale=[[0.0, "#111827"], [1.0, "#111827"]], showscale=False),
+                go.Heatmap(z=tracer, colorscale="Viridis", zmin=0.0, zmax=1.0),
+                go.Heatmap(z=obstacle_z, colorscale=[[0.0, "#111827"], [1.0, "#111827"]], showscale=False),
+                go.Scatter(
+                    x=[0],
+                    y=[0],
+                    mode="text",
+                    text=[f"CL~{lift_history[index]:+.3f}<br>CD~{drag_history[index]:+.3f}"],
+                    textfont={"color": "#f8fafc", "size": 14},
+                    showlegend=False,
+                    hoverinfo="skip",
+                ),
             ],
             name=str(index),
         )
-        for index, (vort, speed, pressure) in enumerate(frames)
+        for index, (vort, speed, pressure, tracer) in enumerate(frames)
     ]
 
     fig.update_xaxes(visible=False, constrain="domain")
     fig.update_yaxes(visible=False, scaleanchor="x", scaleratio=1)
+    fig.update_yaxes(range=[0, 1], row=2, col=2)
     fig.update_layout(
-        title=title,
-        width=1320,
-        height=520,
+        title=f"{title} | final CL~{lift_history[-1]:+.3f}, CD~{drag_history[-1]:+.3f}",
+        width=1180,
+        height=880,
         margin={"l": 20, "r": 20, "t": 70, "b": 20},
         plot_bgcolor="#07111f",
         paper_bgcolor="#07111f",
@@ -338,6 +414,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chord", type=float, default=0.34, help="Airfoil chord length as a fraction of domain width.")
     parser.add_argument("--naca", type=str, default="NACA2412", help="NACA 4-digit airfoil, for example NACA0012 or NACA2412.")
     parser.add_argument("--perturbation", type=float, default=1.0, help="Small inlet disturbance strength.")
+    parser.add_argument("--tracer-decay", type=float, default=0.994, help="Passive flow tracer decay per simulation step.")
     parser.add_argument("--frame-duration-ms", type=int, default=35, help="Animation frame duration in milliseconds.")
     parser.add_argument("--output", type=Path, default=Path("outputs/airfoil_flow_2d.html"), help="Output Plotly HTML path.")
     return parser.parse_args()
@@ -350,7 +427,7 @@ def main() -> None:
     if device.type == "cuda":
         print(f"GPU: {torch.cuda.get_device_name(0)}")
 
-    frames, obstacle = simulate(
+    frames, obstacle, force_history = simulate(
         size_x=args.size_x,
         size_y=args.size_y,
         steps=args.steps,
@@ -363,11 +440,13 @@ def main() -> None:
         chord=args.chord,
         naca=args.naca,
         perturbation=args.perturbation,
+        tracer_decay=args.tracer_decay,
         device=device,
     )
     fig = build_figure(
         frames,
         obstacle,
+        force_history,
         args.frame_duration_ms,
         title=f"2D airfoil flow | {args.naca} | angle {args.angle_of_attack:.1f} deg | frames {len(frames)}",
     )

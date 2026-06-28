@@ -11,7 +11,7 @@ This script is the first airplane-wing style flow experiment in the project.
 It places a NACA 4-digit airfoil inside a 2D incompressible velocity field and
 pushes air from the left side of the domain.
 
-The output HTML has three panels:
+The output HTML has four panels:
 
 1. vorticity / wake
    This shows curl(u, v). Strong positive and negative regions show rotating
@@ -24,6 +24,11 @@ The output HTML has three panels:
    This shows the pressure variable from the projection solve. It is useful
    for qualitative comparison around the upper and lower airfoil surfaces, but
    it is not yet a calibrated engineering pressure coefficient.
+
+4. passive tracer + lift/drag
+   This shows a passive dye injected from the inlet so the flow path around the
+   airfoil is easier to see. The panel also displays rough CL/CD-style values
+   estimated from pressure around the obstacle boundary.
 
 Equations
 ---------
@@ -48,6 +53,8 @@ The code uses this loop:
 5. solve pressure with Jacobi iterations
 6. subtract pressure gradient so div(u) is close to zero
 7. save vorticity, speed, and pressure-like frames
+8. advect passive tracer dye so the wake path is visible
+9. estimate qualitative lift and drag from pressure near the airfoil boundary
 
 Airfoil model
 -------------
@@ -60,6 +67,17 @@ NACA2412 = cambered 12 percent thickness airfoil
 The current script is a qualitative 2D flow visualization. It is useful for
 seeing wake, circulation, and angle-of-attack effects. It is not yet a full CFD
 tool for validated lift/drag numbers.
+
+Lift and drag estimate
+----------------------
+The displayed CL/CD values are rough qualitative estimates. The code samples
+the pressure-like field around obstacle boundary cells and sums the pressure
+imbalance in the vertical and horizontal directions.
+
+This is useful for comparing runs, for example 0 degrees versus 10 degrees
+angle of attack. It should not be interpreted as a validated aerodynamic
+coefficient yet because the obstacle boundary, pressure scaling, and wall shear
+model are still simplified.
 
 Useful parameters
 -----------------
@@ -102,6 +120,10 @@ NACA 4-digit airfoil name, such as NACA0012 or NACA2412.
 Strength of the inlet disturbance. Higher values make vortices appear more
 clearly behind the airfoil.
 
+--tracer-decay
+How quickly the passive inlet dye fades. Higher values keep stream traces
+visible for longer.
+
 Example
 -------
 From the project root:
@@ -115,6 +137,10 @@ More dramatic wake:
 Smoother/heavier run:
 
 .\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_flow_2d --size-x 320 --size-y 160 --pressure-iters 120 --steps 1400 --frame-every 4
+
+Compare a symmetric airfoil at low angle:
+
+.\.venv\Scripts\python.exe -m wave_sim.navier_stokes.airfoil_flow_2d --naca NACA0012 --angle-of-attack 2 --output outputs\airfoil_flow_0012_low_angle.html
 
 Output
 ------
