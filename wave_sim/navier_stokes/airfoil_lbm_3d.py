@@ -356,6 +356,52 @@ def wingtip_vortex_markers(
     return particle_x[mask], particle_y[mask], particle_z[mask], particle_vort[mask]
 
 
+def wingtip_vortex_core_curves(
+    particle_x: np.ndarray,
+    particle_y: np.ndarray,
+    particle_z: np.ndarray,
+    particle_vort: np.ndarray,
+    wing_y: np.ndarray,
+    size_x: int,
+    size_y: int,
+    bins: int = 18,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    if particle_x.size == 0:
+        empty = np.array([], dtype=np.float32)
+        return empty, empty, empty, empty, empty, empty
+
+    left_tip = float(np.min(wing_y))
+    right_tip = float(np.max(wing_y))
+    tip_band = max(3.0, size_y * 0.14)
+    wake_min = size_x * 0.34
+    wake_max = size_x * 0.95
+    edges = np.linspace(wake_min, wake_max, bins + 1)
+
+    curves = []
+    for tip in (left_tip, right_tip):
+        near_tip = np.abs(particle_y - tip) < tip_band
+        in_wake = (particle_x >= wake_min) & (particle_x <= wake_max)
+        threshold = max(float(np.percentile(particle_vort, 62.0)), 1.0e-8)
+        selected = near_tip & in_wake & (particle_vort >= threshold)
+        cx = []
+        cy = []
+        cz = []
+        for start, end in zip(edges[:-1], edges[1:]):
+            bin_mask = selected & (particle_x >= start) & (particle_x < end)
+            if not np.any(bin_mask):
+                continue
+            weight = particle_vort[bin_mask] + 1.0e-6
+            cx.append(float(np.average(particle_x[bin_mask], weights=weight)))
+            cy.append(float(np.average(particle_y[bin_mask], weights=weight)))
+            cz.append(float(np.average(particle_z[bin_mask], weights=weight)))
+        curves.append((
+            np.array(cx, dtype=np.float32),
+            np.array(cy, dtype=np.float32),
+            np.array(cz, dtype=np.float32),
+        ))
+    return (*curves[0], *curves[1])
+
+
 def boundary_points(obstacle: torch.Tensor, max_points: int) -> np.ndarray:
     exposed = obstacle & (
         ~torch.roll(obstacle, shifts=1, dims=0)
@@ -468,6 +514,9 @@ def build_figure(
         size_x,
         size_y,
     )
+    first_left_core_x, first_left_core_y, first_left_core_z, first_right_core_x, first_right_core_y, first_right_core_z = (
+        wingtip_vortex_core_curves(first_x, first_y, first_z, first_vort, wing_y, size_x, size_y)
+    )
 
     fig = go.Figure()
     fig.add_trace(
@@ -533,9 +582,42 @@ def build_figure(
             hoverinfo="skip",
         )
     )
+    fig.add_trace(
+        go.Scatter3d(
+            x=first_left_core_x,
+            y=first_left_core_y,
+            z=first_left_core_z,
+            mode="lines+markers",
+            line={"width": 7.0, "color": "#f97316"},
+            marker={"size": 4.0, "color": "#fed7aa"},
+            name="left vortex core",
+            hoverinfo="skip",
+        )
+    )
+    fig.add_trace(
+        go.Scatter3d(
+            x=first_right_core_x,
+            y=first_right_core_y,
+            z=first_right_core_z,
+            mode="lines+markers",
+            line={"width": 7.0, "color": "#facc15"},
+            marker={"size": 4.0, "color": "#fef08a"},
+            name="right vortex core",
+            hoverinfo="skip",
+        )
+    )
     plotly_frames = []
     for index, (x, y, z, vort, line_x, line_y, line_z) in enumerate(frames):
         tip_x, tip_y, tip_z, tip_vort = wingtip_vortex_markers(x, y, z, vort, wing_y, size_x, size_y)
+        left_core_x, left_core_y, left_core_z, right_core_x, right_core_y, right_core_z = wingtip_vortex_core_curves(
+            x,
+            y,
+            z,
+            vort,
+            wing_y,
+            size_x,
+            size_y,
+        )
         plotly_frames.append(
             go.Frame(
                 data=[
@@ -567,6 +649,22 @@ def build_figure(
                             "cmax": vort_limit,
                             "opacity": 0.95,
                         },
+                    ),
+                    go.Scatter3d(
+                        x=left_core_x,
+                        y=left_core_y,
+                        z=left_core_z,
+                        mode="lines+markers",
+                        line={"width": 7.0, "color": "#f97316"},
+                        marker={"size": 4.0, "color": "#fed7aa"},
+                    ),
+                    go.Scatter3d(
+                        x=right_core_x,
+                        y=right_core_y,
+                        z=right_core_z,
+                        mode="lines+markers",
+                        line={"width": 7.0, "color": "#facc15"},
+                        marker={"size": 4.0, "color": "#fef08a"},
                     ),
                 ],
                 name=str(index),
@@ -627,7 +725,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--size-x", type=int, default=80, help="Grid width along the flow.")
     parser.add_argument("--size-y", type=int, default=42, help="Grid span direction.")
     parser.add_argument("--size-z", type=int, default=30, help="Grid vertical direction.")
-    parser.add_argument("--steps", type=int, default=520, help="LBM time steps.")
+    parser.add_argument("--steps", type=int, default=650, help="LBM time steps.")
     parser.add_argument("--frame-every", type=int, default=13, help="Save one viewer frame every N steps.")
     parser.add_argument("--tau", type=float, default=0.60, help="LBM relaxation time. Must be greater than 0.5.")
     parser.add_argument("--inlet-velocity", type=float, default=0.045, help="Lattice-unit inlet speed.")
@@ -635,7 +733,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chord", type=float, default=0.28, help="Wing chord as a fraction of domain length.")
     parser.add_argument("--span", type=float, default=0.58, help="Wing span as a fraction of domain width.")
     parser.add_argument("--thickness", type=float, default=0.13, help="NACA-like relative thickness.")
-    parser.add_argument("--particles", type=int, default=650, help="Passive tracer particles.")
+    parser.add_argument("--particles", type=int, default=760, help="Passive tracer particles.")
     parser.add_argument("--particle-step-scale", type=float, default=4.0, help="Particle advection visual speed multiplier.")
     parser.add_argument("--trail-length", type=int, default=18, help="Number of recent particle positions shown as pathline curves.")
     parser.add_argument("--frame-duration-ms", type=int, default=45, help="Animation frame duration in milliseconds.")

@@ -17,7 +17,9 @@ The output shows:
 2. passive pathline curves moving through the computed velocity field
 3. particle heads colored by local vorticity magnitude
 4. highlighted wingtip-vortex markers near the two wing tips
-5. an animated 3D view that can be rotated and zoomed in the browser
+5. left and right wingtip vortex-core curves estimated from high-vorticity
+   particle clusters
+6. an animated 3D view that can be rotated and zoomed in the browser
 
 Method
 ------
@@ -33,6 +35,8 @@ The solver uses a D3Q19 Lattice Boltzmann Method:
 8. keep recent particle positions as pathline curves
 9. color particle heads by local vorticity magnitude
 10. highlight high-vorticity particles near the finite-wing tips
+11. bin high-vorticity wingtip particles downstream and connect their weighted
+    centers as approximate vortex-core curves
 
 Why this does not need Blender
 ------------------------------
@@ -113,7 +117,9 @@ pass around the smooth finite wing, and continue into the wake. The pale curves
 are recent particle histories, so they read more like wind-tunnel streamlines.
 Warmer particle colors mean stronger local vorticity. The larger yellow-orange
 markers appear where high-vorticity particles pass close to the left or right
-wing tip, making the wingtip-vortex region easier to find.
+wing tip. The thicker orange/yellow curves connect the downstream centers of
+those high-vorticity wingtip clusters, so they act as an approximate wingtip
+vortex-core guide.
 
 Current limitations
 -------------------
@@ -124,14 +130,17 @@ The main limitations are:
 1. the finite wing shape is simplified, though it is now rendered as a smooth
    mesh instead of grid obstacle points
 2. boundaries are practical open-ish approximations
-3. pathline curves show flow paths but are not real smoke
-4. force coefficients are not computed yet
-5. turbulence modeling and high-Reynolds behavior are not included
+3. vortex-core curves are estimated from particle clusters, not extracted from
+   a validated vortex-core criterion yet
+4. pathline curves show flow paths but are not real smoke
+5. force coefficients are not computed yet
+6. turbulence modeling and high-Reynolds behavior are not included
 
 Good next steps are:
 
 1. improve wing geometry and make NACA section selectable
 2. add force estimation with 3D momentum exchange
-3. replace the current particle-based wingtip markers with vortex-core curves
+3. replace the current particle-cluster core estimate with a Q-criterion or
+   lambda-2 vortex-core method
 4. export smaller NPZ datasets for reusable visualization
 5. build a Three.js viewer if Plotly becomes too limiting
