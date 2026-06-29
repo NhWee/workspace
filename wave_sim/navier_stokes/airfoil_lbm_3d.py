@@ -1,6 +1,6 @@
 # 3D finite-wing flow using a D3Q19 Lattice Boltzmann Method solver with PyTorch GPU acceleration.
 # This runs without Blender: PyTorch computes the flow and Plotly writes an
-# interactive 3D HTML viewer with a smooth wing mesh and passive pathline curves.
+# interactive 3D HTML viewer with a smooth wing mesh and smoke-like pathline curves.
 # You can handle the parameters
 # size_x, size_y, size_z, steps, frame_every, tau, inlet_velocity,
 # angle_of_attack, chord, span, thickness, particles, trail_length, output
@@ -475,7 +475,7 @@ def simulate(
             scaled_trail_x = (trail_x * (size_x - 1)).detach().cpu().numpy().astype(np.float32)
             scaled_trail_y = (trail_y * (size_y - 1)).detach().cpu().numpy().astype(np.float32)
             scaled_trail_z = (trail_z * (size_z - 1)).detach().cpu().numpy().astype(np.float32)
-            line_x, line_y, line_z = trails_to_plot_arrays(scaled_trail_x, scaled_trail_y, scaled_trail_z, max_lines=140)
+            line_x, line_y, line_z = trails_to_plot_arrays(scaled_trail_x, scaled_trail_y, scaled_trail_z, max_lines=95)
             frames.append(
                 (
                     (px * (size_x - 1)).detach().cpu().numpy().astype(np.float32),
@@ -534,14 +534,15 @@ def build_figure(
             hoverinfo="skip",
         )
     )
+    smoke_line = {"width": 5.0, "color": "rgba(219, 234, 254, 0.68)"}
     fig.add_trace(
         go.Scatter3d(
             x=first_line_x,
             y=first_line_y,
             z=first_line_z,
             mode="lines",
-            line={"width": 3.0, "color": "rgba(191, 219, 254, 0.42)"},
-            name="pathlines",
+            line=smoke_line,
+            name="smoke pathlines",
             hoverinfo="skip",
         )
     )
@@ -552,16 +553,17 @@ def build_figure(
             z=first_z,
             mode="markers",
             marker={
-                "size": 2.6,
+                "size": 1.2,
                 "color": first_vort,
                 "colorscale": "Turbo",
                 "cmin": 0.0,
                 "cmax": vort_limit,
-                "opacity": 0.92,
+                "opacity": 0.16,
                 "colorbar": {"title": "vort"},
             },
-            name="particle heads",
+            name="particle heads (debug)",
             hoverinfo="skip",
+            visible="legendonly",
         )
     )
     fig.add_trace(
@@ -571,15 +573,16 @@ def build_figure(
             z=first_tip_z,
             mode="markers",
             marker={
-                "size": 5.2,
+                "size": 2.5,
                 "color": first_tip_vort,
                 "colorscale": [[0.0, "#fde047"], [0.55, "#fb923c"], [1.0, "#ef4444"]],
                 "cmin": 0.0,
                 "cmax": vort_limit,
-                "opacity": 0.95,
+                "opacity": 0.22,
             },
-            name="wingtip vortex",
+            name="wingtip marker samples",
             hoverinfo="skip",
+            visible="legendonly",
         )
     )
     fig.add_trace(
@@ -588,8 +591,8 @@ def build_figure(
             y=first_left_core_y,
             z=first_left_core_z,
             mode="lines+markers",
-            line={"width": 7.0, "color": "#f97316"},
-            marker={"size": 4.0, "color": "#fed7aa"},
+            line={"width": 9.0, "color": "#f97316"},
+            marker={"size": 2.0, "color": "#fed7aa", "opacity": 0.5},
             name="left vortex core",
             hoverinfo="skip",
         )
@@ -600,8 +603,8 @@ def build_figure(
             y=first_right_core_y,
             z=first_right_core_z,
             mode="lines+markers",
-            line={"width": 7.0, "color": "#facc15"},
-            marker={"size": 4.0, "color": "#fef08a"},
+            line={"width": 9.0, "color": "#facc15"},
+            marker={"size": 2.0, "color": "#fef08a", "opacity": 0.5},
             name="right vortex core",
             hoverinfo="skip",
         )
@@ -627,14 +630,15 @@ def build_figure(
                         y=line_y,
                         z=line_z,
                         mode="lines",
-                        line={"width": 3.0, "color": "rgba(191, 219, 254, 0.42)"},
+                        line=smoke_line,
                     ),
                     go.Scatter3d(
                         x=x,
                         y=y,
                         z=z,
                         mode="markers",
-                        marker={"size": 2.6, "color": vort, "colorscale": "Turbo", "cmin": 0.0, "cmax": vort_limit, "opacity": 0.92},
+                        marker={"size": 1.2, "color": vort, "colorscale": "Turbo", "cmin": 0.0, "cmax": vort_limit, "opacity": 0.16},
+                        visible="legendonly",
                     ),
                     go.Scatter3d(
                         x=tip_x,
@@ -642,29 +646,30 @@ def build_figure(
                         z=tip_z,
                         mode="markers",
                         marker={
-                            "size": 5.2,
+                            "size": 2.5,
                             "color": tip_vort,
                             "colorscale": [[0.0, "#fde047"], [0.55, "#fb923c"], [1.0, "#ef4444"]],
                             "cmin": 0.0,
                             "cmax": vort_limit,
-                            "opacity": 0.95,
+                            "opacity": 0.22,
                         },
+                        visible="legendonly",
                     ),
                     go.Scatter3d(
                         x=left_core_x,
                         y=left_core_y,
                         z=left_core_z,
                         mode="lines+markers",
-                        line={"width": 7.0, "color": "#f97316"},
-                        marker={"size": 4.0, "color": "#fed7aa"},
+                        line={"width": 9.0, "color": "#f97316"},
+                        marker={"size": 2.0, "color": "#fed7aa", "opacity": 0.5},
                     ),
                     go.Scatter3d(
                         x=right_core_x,
                         y=right_core_y,
                         z=right_core_z,
                         mode="lines+markers",
-                        line={"width": 7.0, "color": "#facc15"},
-                        marker={"size": 4.0, "color": "#fef08a"},
+                        line={"width": 9.0, "color": "#facc15"},
+                        marker={"size": 2.0, "color": "#fef08a", "opacity": 0.5},
                     ),
                 ],
                 name=str(index),
@@ -735,7 +740,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--thickness", type=float, default=0.13, help="NACA-like relative thickness.")
     parser.add_argument("--particles", type=int, default=760, help="Passive tracer particles.")
     parser.add_argument("--particle-step-scale", type=float, default=4.0, help="Particle advection visual speed multiplier.")
-    parser.add_argument("--trail-length", type=int, default=18, help="Number of recent particle positions shown as pathline curves.")
+    parser.add_argument("--trail-length", type=int, default=28, help="Number of recent particle positions shown as pathline curves.")
     parser.add_argument("--frame-duration-ms", type=int, default=45, help="Animation frame duration in milliseconds.")
     parser.add_argument("--output", type=Path, default=Path("outputs/airfoil_lbm_3d.html"), help="Output Plotly HTML path.")
     return parser.parse_args()

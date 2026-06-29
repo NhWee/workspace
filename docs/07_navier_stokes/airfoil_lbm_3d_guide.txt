@@ -14,9 +14,9 @@ interactive 3D HTML viewer.
 The output shows:
 
 1. a smooth finite-wing surface mesh
-2. passive pathline curves moving through the computed velocity field
-3. particle heads colored by local vorticity magnitude
-4. highlighted wingtip-vortex markers near the two wing tips
+2. smoke-like pathline curves moving through the computed velocity field
+3. particle heads and marker samples hidden by default as debug traces
+4. highlighted wingtip-vortex core curves near the two wing tips
 5. left and right wingtip vortex-core curves estimated from high-vorticity
    particle clusters
 6. an animated 3D view that can be rotated and zoomed in the browser
@@ -32,9 +32,9 @@ The solver uses a D3Q19 Lattice Boltzmann Method:
 5. apply bounce-back on the finite wing obstacle
 6. apply inlet, outlet, and side open-ish boundaries
 7. advect passive particles through the velocity field
-8. keep recent particle positions as pathline curves
-9. color particle heads by local vorticity magnitude
-10. highlight high-vorticity particles near the finite-wing tips
+8. keep recent particle positions as longer smoke-like pathline curves
+9. hide raw particle heads by default so the view reads as continuous flow
+10. optionally expose high-vorticity marker samples near the finite-wing tips
 11. bin high-vorticity wingtip particles downstream and connect their weighted
     centers as approximate vortex-core curves
 
@@ -88,7 +88,8 @@ move through the viewer, not the LBM solver itself.
 
 --trail-length
 Number of recent particle positions drawn as pathline curves. Higher values
-make the flow look more continuous but create larger HTML files.
+make the flow look more continuous but create larger HTML files. The default is
+now tuned to favor continuous smoke-like lines over point clouds.
 
 Example
 -------
@@ -112,14 +113,12 @@ outputs\airfoil_lbm_3d.html
 
 How to read it
 --------------
-Open the HTML and look at the moving particles. They start from the inlet,
-pass around the smooth finite wing, and continue into the wake. The pale curves
-are recent particle histories, so they read more like wind-tunnel streamlines.
-Warmer particle colors mean stronger local vorticity. The larger yellow-orange
-markers appear where high-vorticity particles pass close to the left or right
-wing tip. The thicker orange/yellow curves connect the downstream centers of
-those high-vorticity wingtip clusters, so they act as an approximate wingtip
-vortex-core guide.
+Open the HTML and first look at the pale smoke-like curves. They start from the
+inlet, pass around the smooth finite wing, and continue into the wake. Raw
+particle heads and wingtip marker samples are hidden in the legend by default
+because they make the flow look too much like a point cloud. The thicker
+orange/yellow curves connect the downstream centers of high-vorticity wingtip
+clusters, so they act as an approximate wingtip vortex-core guide.
 
 Current limitations
 -------------------
